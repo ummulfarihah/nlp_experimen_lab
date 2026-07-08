@@ -140,10 +140,10 @@ yacht/
 *.sqlite3
 
 # NLP Lab Dynamic Uploads, Datasets, Logs, and Models
-static/uploads/logs/
-static/uploads/models/
-static/uploads/datasets/
-static/uploads/avatars/
+static/uploads/logs/*
+static/uploads/models/*
+static/uploads/datasets/*
+static/uploads/avatars/*
 !static/uploads/logs/.gitkeep
 !static/uploads/models/.gitkeep
 !static/uploads/datasets/.gitkeep
