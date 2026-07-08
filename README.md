@@ -82,8 +82,8 @@ nlp_experimen_lab/
 │   │   └── style.css           # Berkas gaya tampilan antarmuka (Vanilla CSS)
 │   ├── js/
 │   │   ├── app.js              # Logika frontend utama dan AJAX
-│   │   └── charts.js           # Logika visualisasi grafik evaluasi (Chart.js)
-│   └── uploads/                # Direktori penyimpanan dinamis (diabaikan oleh git)
+│   │   └── charts.js                   # Logika visualisasi grafik evaluasi (Chart.js)
+│   └── uploads/                # Direktori penyimpanan dinamis
 │       ├── datasets/           # Berkas CSV dataset yang diunggah
 │       ├── models/             # Berkas biner model terlatih (.pkl)
 │       ├── logs/               # Catatan log fisik per pekerjaan (.log)
@@ -94,14 +94,14 @@ nlp_experimen_lab/
 ├── config.py                   # Konfigurasi sistem & jalur direktori
 ├── database.py                 # Manajemen inisialisasi & koneksi database SQLite
 ├── ml_engine.py                # Pipeline Preprocessing, Naive Bayes & SVM
-├── bert_engine.py              # Fine-Tuning IndoBERT (PyTorch/Transformers)
-├── task_manager.py             # Pengelola antrean pelatihan asinkron (Threading Worker)
+├── bert_engine.py              # Fine-Tuning IndoBERT
+├── task_manager.py             # Pengelola antrean pelatihan asinkron
 ├── verify.py                   # Alat pengujian otomatisasi mandiri
-├── nlp_experiments.ipynb       # Jupyter Notebook Eksperimen Utama
-├── hyperparameter_tuning.ipynb # Jupyter Notebook Penalaan Parameter (Grid Search)
-├── run_server_colab.ipynb      # Jupyter Notebook Runner Server di Google Colab
+├── nlp_experiments.ipynb       # Notebook Eksperimen Utama
+├── hyperparameter_tuning.ipynb # Notebook Penalaan Parameter
+├── run_server_colab.ipynb      # Notebook Runner Server di Google Colab
 ├── requirements.txt            # Daftar pustaka & dependensi Python
-└── README.md                   # Dokumentasi panduan penggunaan (berkas ini)
+└── README.md                   # Dokumentasi panduan penggunaan
 ```
 
 ---
