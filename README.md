@@ -79,29 +79,29 @@ Jika Anda tidak memiliki GPU NVIDIA lokal, Anda dapat menjalankan server Flask i
 nlp_experimen_lab/
 ├── static/
 │   ├── css/
-│   │   └── style.css       # Berkas gaya tampilan antarmuka (Vanilla CSS)
+│   │   └── style.css           # Berkas gaya tampilan antarmuka (Vanilla CSS)
 │   ├── js/
-│   │   ├── app.js          # Logika frontend utama dan AJAX
-│   │   └── charts.js       # Logika visualisasi grafik evaluasi (Chart.js)
-│   └── uploads/            # Direktori penyimpanan dinamis (diabaikan oleh git)
-│       ├── datasets/       # Berkas CSV dataset yang diunggah
-│       ├── models/         # Berkas biner model terlatih (.pkl)
-│       ├── logs/           # Catatan log fisik per pekerjaan (.log)
-│       └── avatars/        # Foto profil pengguna
-├── templates/              # Halaman HTML Frontend Flask
-│   └── index.html          # Single Page Application utama
-├── app.py                  # API Server & Backend Entrypoint
-├── config.py               # Konfigurasi sistem & jalur direktori
-├── database.py             # Manajemen inisialisasi & koneksi database SQLite
-├── ml_engine.py            # Pipeline Preprocessing, Naive Bayes & SVM
-├── bert_engine.py          # Fine-Tuning IndoBERT (PyTorch/Transformers)
-├── task_manager.py         # Pengelola antrean pelatihan asinkron (Threading Worker)
-├── verify.py               # Alat pengujian otomatisasi mandiri
-├── nlp_experiments.ipynb   # Jupyter Notebook Eksperimen Utama
+│   │   ├── app.js              # Logika frontend utama dan AJAX
+│   │   └── charts.js           # Logika visualisasi grafik evaluasi (Chart.js)
+│   └── uploads/                # Direktori penyimpanan dinamis (diabaikan oleh git)
+│       ├── datasets/           # Berkas CSV dataset yang diunggah
+│       ├── models/             # Berkas biner model terlatih (.pkl)
+│       ├── logs/               # Catatan log fisik per pekerjaan (.log)
+│       └── avatars/            # Foto profil pengguna
+├── templates/                  # Halaman HTML Frontend Flask
+│   └── index.html              # Single Page Application utama
+├── app.py                      # API Server & Backend Entrypoint
+├── config.py                   # Konfigurasi sistem & jalur direktori
+├── database.py                 # Manajemen inisialisasi & koneksi database SQLite
+├── ml_engine.py                # Pipeline Preprocessing, Naive Bayes & SVM
+├── bert_engine.py              # Fine-Tuning IndoBERT (PyTorch/Transformers)
+├── task_manager.py             # Pengelola antrean pelatihan asinkron (Threading Worker)
+├── verify.py                   # Alat pengujian otomatisasi mandiri
+├── nlp_experiments.ipynb       # Jupyter Notebook Eksperimen Utama
 ├── hyperparameter_tuning.ipynb # Jupyter Notebook Penalaan Parameter (Grid Search)
-├── run_server_colab.ipynb  # Jupyter Notebook Runner Server di Google Colab
-├── requirements.txt        # Daftar pustaka & dependensi Python
-└── README.md               # Dokumentasi panduan penggunaan (berkas ini)
+├── run_server_colab.ipynb      # Jupyter Notebook Runner Server di Google Colab
+├── requirements.txt            # Daftar pustaka & dependensi Python
+└── README.md                   # Dokumentasi panduan penggunaan (berkas ini)
 ```
 
 ---
