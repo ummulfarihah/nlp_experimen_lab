@@ -1450,16 +1450,22 @@ function inspectModel(jobId) {
                 
                 const classKeys = Object.keys(classes).filter(k => !['accuracy', 'macro avg', 'weighted avg'].includes(k));
                 
+                // Calculate total support
+                let totalSupport = 0;
+                classKeys.forEach(k => {
+                    totalSupport += Math.round(classes[k].support || 0);
+                });
+
                 // 1. Individual classes (negative, neutral, positive)
                 classKeys.forEach(k => {
                     const rowData = classes[k];
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="font-medium">${k}</td>
-                        <td class="text-right">${rowData.precision.toFixed(2)}</td>
-                        <td class="text-right">${rowData.recall.toFixed(2)}</td>
-                        <td class="text-right">${rowData['f1-score'].toFixed(2)}</td>
-                        <td class="text-right">${rowData.support.toFixed(2)}</td>
+                        <td class="text-right">${rowData.precision.toFixed(4)}</td>
+                        <td class="text-right">${rowData.recall.toFixed(4)}</td>
+                        <td class="text-right">${rowData['f1-score'].toFixed(4)}</td>
+                        <td class="text-right">${Math.round(rowData.support)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1470,10 +1476,10 @@ function inspectModel(jobId) {
                     const trAcc = document.createElement('tr');
                     trAcc.innerHTML = `
                         <td class="font-medium">accuracy</td>
-                        <td class="text-right">${accVal.toFixed(2)}</td>
-                        <td class="text-right">${accVal.toFixed(2)}</td>
-                        <td class="text-right">${accVal.toFixed(2)}</td>
-                        <td class="text-right">${accVal.toFixed(2)}</td>
+                        <td class="text-right"></td>
+                        <td class="text-right"></td>
+                        <td class="text-right">${accVal.toFixed(4)}</td>
+                        <td class="text-right">${totalSupport}</td>
                     `;
                     tbody.appendChild(trAcc);
                 }
@@ -1484,10 +1490,10 @@ function inspectModel(jobId) {
                     const trMacro = document.createElement('tr');
                     trMacro.innerHTML = `
                         <td class="font-medium">macro avg</td>
-                        <td class="text-right">${macroVal.precision.toFixed(2)}</td>
-                        <td class="text-right">${macroVal.recall.toFixed(2)}</td>
-                        <td class="text-right">${macroVal['f1-score'].toFixed(2)}</td>
-                        <td class="text-right">${macroVal.support.toFixed(2)}</td>
+                        <td class="text-right">${macroVal.precision.toFixed(4)}</td>
+                        <td class="text-right">${macroVal.recall.toFixed(4)}</td>
+                        <td class="text-right">${macroVal['f1-score'].toFixed(4)}</td>
+                        <td class="text-right">${Math.round(macroVal.support)}</td>
                     `;
                     tbody.appendChild(trMacro);
                 }
@@ -1498,10 +1504,10 @@ function inspectModel(jobId) {
                     const trWeighted = document.createElement('tr');
                     trWeighted.innerHTML = `
                         <td class="font-medium">weighted avg</td>
-                        <td class="text-right">${weightedVal.precision.toFixed(2)}</td>
-                        <td class="text-right">${weightedVal.recall.toFixed(2)}</td>
-                        <td class="text-right">${weightedVal['f1-score'].toFixed(2)}</td>
-                        <td class="text-right">${weightedVal.support.toFixed(2)}</td>
+                        <td class="text-right">${weightedVal.precision.toFixed(4)}</td>
+                        <td class="text-right">${weightedVal.recall.toFixed(4)}</td>
+                        <td class="text-right">${weightedVal['f1-score'].toFixed(4)}</td>
+                        <td class="text-right">${Math.round(weightedVal.support)}</td>
                     `;
                     tbody.appendChild(trWeighted);
                 }
