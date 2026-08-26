@@ -325,6 +325,7 @@ function handleViewActivated(viewId) {
     }
     
     if (viewId === 'training') {
+        initStaticCustomDropdowns();
         fetchDatasetsList(); // load dataset selector option
         fetchJobsHistory();
         checkActiveRunningJob();
@@ -767,6 +768,8 @@ function fetchDatasetsList() {
                     testDropdown.innerHTML += opt;
                     valDropdown.innerHTML += opt;
                 });
+                
+                renderCustomDatasetDropdowns();
                 
                 // Render Datasets Table
                 const tbody = document.getElementById('dataset-table-body');
@@ -1891,7 +1894,136 @@ function inspectModel(jobId) {
 }
 
 
-// --- MCNEMAR SIGNIFICANCE LAB & MODEL SELECTOR THEMED ENGINE ---
+// --- UNIVERSAL CUSTOM GLASSMORPHISM DROPDOWN ENGINE ---
+function buildCustomDropdown(selectId, customOptionsHtmlGenerator = null) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    // Hide native select visually while keeping accessible for forms
+    select.style.display = 'none';
+
+    let customWrap = select.parentElement.querySelector(`.custom-dropdown-container[data-target="${selectId}"]`);
+    if (!customWrap) {
+        customWrap = document.createElement('div');
+        customWrap.className = 'custom-dropdown-container';
+        customWrap.setAttribute('data-target', selectId);
+        select.parentElement.insertBefore(customWrap, select.nextSibling);
+    }
+
+    const options = Array.from(select.options);
+    const selectedOption = select.options[select.selectedIndex] || options[0];
+    const defaultPlaceholder = options[0] ? options[0].text : '-- Pilih --';
+    const isSelectedValEmpty = !select.value || select.value === '';
+
+    const triggerHtml = `
+        <button type="button" class="custom-dropdown-trigger" id="trigger-${selectId}">
+            <span class="custom-dropdown-selected-text ${isSelectedValEmpty ? 'text-rose-mauve' : 'text-dark font-bold'}">
+                ${selectedOption && !isSelectedValEmpty ? selectedOption.text : defaultPlaceholder}
+            </span>
+            <i data-lucide="chevron-down" class="custom-dropdown-arrow inline-block w-4 h-4"></i>
+        </button>
+    `;
+
+    let menuItemsHtml = '';
+    if (customOptionsHtmlGenerator && typeof customOptionsHtmlGenerator === 'function') {
+        menuItemsHtml = customOptionsHtmlGenerator(options, select.value);
+    } else {
+        menuItemsHtml = options.map(opt => `
+            <div class="custom-dropdown-item ${opt.value === select.value && opt.value !== '' ? 'is-selected' : ''}" data-value="${opt.value}">
+                <div class="flex items-center justify-between py-0.5">
+                    <span class="font-medium text-dark text-xs sm:text-sm ${opt.value === '' ? 'text-rose-mauve italic' : ''}">${opt.text}</span>
+                    ${opt.value === select.value && opt.value !== '' ? '<i data-lucide="check" class="w-3.5 h-3.5 text-primary-pink"></i>' : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    customWrap.innerHTML = `
+        ${triggerHtml}
+        <div class="custom-dropdown-menu hidden" id="menu-${selectId}">
+            ${menuItemsHtml}
+        </div>
+    `;
+
+    if (window.lucide) lucide.createIcons({ root: customWrap });
+
+    const trigger = customWrap.querySelector('.custom-dropdown-trigger');
+    const menu = customWrap.querySelector('.custom-dropdown-menu');
+    const textSpan = customWrap.querySelector('.custom-dropdown-selected-text');
+    const items = customWrap.querySelectorAll('.custom-dropdown-item');
+
+    trigger.onclick = (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.custom-dropdown-container').forEach(c => {
+            if (c !== customWrap) {
+                c.classList.remove('is-open');
+                const m = c.querySelector('.custom-dropdown-menu');
+                if (m) m.classList.add('hidden');
+            }
+        });
+        const isOpen = customWrap.classList.toggle('is-open');
+        menu.classList.toggle('hidden', !isOpen);
+    };
+
+    items.forEach(item => {
+        item.onclick = (e) => {
+            e.stopPropagation();
+            const val = item.dataset.value;
+            select.value = val;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+
+            const matchedOpt = options.find(o => String(o.value) === String(val));
+            if (matchedOpt && val !== '') {
+                textSpan.textContent = matchedOpt.text;
+                textSpan.className = 'custom-dropdown-selected-text text-dark font-bold';
+            } else {
+                textSpan.textContent = defaultPlaceholder;
+                textSpan.className = 'custom-dropdown-selected-text text-rose-mauve';
+            }
+
+            items.forEach(i => i.classList.remove('is-selected'));
+            if (val !== '') item.classList.add('is-selected');
+
+            customWrap.classList.remove('is-open');
+            menu.classList.add('hidden');
+        };
+    });
+}
+
+function renderCustomDatasetDropdowns() {
+    ['train-dataset', 'train-test-dataset', 'train-val-dataset'].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+
+        buildCustomDropdown(id, (options, selectedVal) => {
+            if (STATE.datasets.length === 0) {
+                return '<div class="p-3 text-center text-xs text-rose-mauve">Belum ada dataset diunggah.</div>';
+            }
+            const placeholderText = id === 'train-dataset' ? '-- Pilih Dataset --' : (id === 'train-test-dataset' ? '-- Pilih Dataset Uji --' : '-- Tanpa Validasi (Opsional) --');
+            return `
+                <div class="custom-dropdown-item ${selectedVal === '' ? 'is-selected' : ''}" data-value="">
+                    <span class="text-xs text-rose-mauve italic">${placeholderText}</span>
+                </div>
+                ${STATE.datasets.map(d => `
+                    <div class="custom-dropdown-item ${String(d.id) === String(selectedVal) ? 'is-selected' : ''}" data-value="${d.id}">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="font-bold text-dark text-xs sm:text-sm">${d.name}</span>
+                            <span class="badge badge-neutral text-2xs">${d.total_samples} baris</span>
+                        </div>
+                        <div class="text-[11px] text-rose-mauve font-mono">SHA: ${d.file_hash.substring(0, 10)}...</div>
+                    </div>
+                `).join('')}
+            `;
+        });
+    });
+}
+
+function initStaticCustomDropdowns() {
+    ['train-model-type', 'param-kernel', 'param-gamma'].forEach(id => {
+        buildCustomDropdown(id);
+    });
+}
+
 function fetchModelsDropdowns(dropdownIds) {
     fetch('/api/v1/experiments/jobs')
         .then(res => res.json())
@@ -1903,33 +2035,21 @@ function fetchModelsDropdowns(dropdownIds) {
                     const select = document.getElementById(ddId);
                     if (!select) return;
                     
-                    // Keep native select in sync for form submissions
                     select.innerHTML = `<option value="">-- Pilih Model --</option>`;
                     completedJobs.forEach(job => {
                         select.innerHTML += `<option value="${job.id}">${job.exp_name} [${job.model_type.toUpperCase()}] (Dataset: ${job.dataset_name})</option>`;
                     });
                     
-                    // Hide native select visually
-                    select.style.display = 'none';
-
-                    // Ensure custom themed dropdown container exists
-                    let customWrap = select.parentElement.querySelector('.custom-dropdown-container');
-                    if (!customWrap) {
-                        customWrap = document.createElement('div');
-                        customWrap.className = 'custom-dropdown-container';
-                        select.parentElement.insertBefore(customWrap, select.nextSibling);
-                    }
-
-                    // Build trigger button and menu with 3-row aligned meta list
-                    customWrap.innerHTML = `
-                        <button type="button" class="custom-dropdown-trigger" id="trigger-${ddId}">
-                            <span class="custom-dropdown-selected-text text-rose-mauve">-- Pilih Model --</span>
-                            <i data-lucide="chevron-down" class="custom-dropdown-arrow inline-block w-4 h-4"></i>
-                        </button>
-                        <div class="custom-dropdown-menu hidden" id="menu-${ddId}">
-                            ${completedJobs.length === 0 ? '<div class="p-3 text-center text-xs text-rose-mauve">Belum ada model terlatih.</div>' : ''}
+                    buildCustomDropdown(ddId, (options, selectedVal) => {
+                        if (completedJobs.length === 0) {
+                            return '<div class="p-3 text-center text-xs text-rose-mauve">Belum ada model terlatih.</div>';
+                        }
+                        return `
+                            <div class="custom-dropdown-item ${selectedVal === '' ? 'is-selected' : ''}" data-value="">
+                                <span class="text-xs text-rose-mauve italic">-- Pilih Model --</span>
+                            </div>
                             ${completedJobs.map(job => `
-                                <div class="custom-dropdown-item" data-value="${job.id}">
+                                <div class="custom-dropdown-item ${String(job.id) === String(selectedVal) ? 'is-selected' : ''}" data-value="${job.id}">
                                     <div class="timeline-meta-grid">
                                         <div class="meta-row">
                                             <span class="meta-label">Nama model</span>
@@ -1949,60 +2069,8 @@ function fetchModelsDropdowns(dropdownIds) {
                                     </div>
                                 </div>
                             `).join('')}
-                        </div>
-                    `;
-
-                    if (window.lucide) lucide.createIcons({ root: customWrap });
-
-                    const trigger = customWrap.querySelector('.custom-dropdown-trigger');
-                    const menu = customWrap.querySelector('.custom-dropdown-menu');
-                    const textSpan = customWrap.querySelector('.custom-dropdown-selected-text');
-                    const items = customWrap.querySelectorAll('.custom-dropdown-item');
-
-                    // Toggle open/close
-                    trigger.onclick = (e) => {
-                        e.stopPropagation();
-                        // Close other open custom dropdowns
-                        document.querySelectorAll('.custom-dropdown-container').forEach(c => {
-                            if (c !== customWrap) {
-                                c.classList.remove('is-open');
-                                const m = c.querySelector('.custom-dropdown-menu');
-                                if (m) m.classList.add('hidden');
-                            }
-                        });
-                        const isOpen = customWrap.classList.toggle('is-open');
-                        menu.classList.toggle('hidden', !isOpen);
-                    };
-
-                    // Item selection handler
-                    items.forEach(item => {
-                        item.onclick = (e) => {
-                            e.stopPropagation();
-                            const val = item.dataset.value;
-                            const job = completedJobs.find(j => String(j.id) === String(val));
-                            if (job) {
-                                select.value = job.id;
-                                select.dispatchEvent(new Event('change'));
-                                textSpan.textContent = `${job.exp_name} [${job.model_type.toUpperCase()}]`;
-                                textSpan.className = "custom-dropdown-selected-text text-dark font-bold";
-                                items.forEach(i => i.classList.remove('is-selected'));
-                                item.classList.add('is-selected');
-                            }
-                            customWrap.classList.remove('is-open');
-                            menu.classList.add('hidden');
-                        };
+                        `;
                     });
-
-                    // Set initial value if select already has one
-                    if (select.value) {
-                        const initJob = completedJobs.find(j => String(j.id) === String(select.value));
-                        if (initJob) {
-                            textSpan.textContent = `${initJob.exp_name} [${initJob.model_type.toUpperCase()}]`;
-                            textSpan.className = "custom-dropdown-selected-text text-dark font-bold";
-                            const matchItem = customWrap.querySelector(`[data-value="${initJob.id}"]`);
-                            if (matchItem) matchItem.classList.add('is-selected');
-                        }
-                    }
                 });
             }
         });
@@ -2507,6 +2575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initSidebarState();
     checkAuthentication();
+    initStaticCustomDropdowns();
 });
 
 // --- BACKEND HEALTH CHECK & SERVER OFFLINE INTERCEPTOR ---
