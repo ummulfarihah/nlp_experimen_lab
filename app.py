@@ -147,37 +147,75 @@ def health_check():
 # --- AUTH API ---
 @app.route('/api/v1/auth/google', methods=['POST'])
 def auth_google():
-    """Handles Google OAuth Token verification (or simulation)."""
+    """Handles Google OAuth Token verification (ID Token, Access Token, or OAuth2 Payload)."""
     data = request.json or {}
-    credential = data.get('credential')
+    credential = data.get('credential') or data.get('access_token') or data.get('id_token')
     
     if not credential:
         return error_response("Token credential is required.")
         
-    user_info = {
-        "id": "10839218209382109",
-        "email": "researcher@nlplab.org",
-        "name": "NLP Researcher",
-        "picture": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
-        "role": "Lead Scientist"
-    }
+    user_info = None
     
+    # 1. Try verifying with Google OAuth ID Token
     if GOOGLE_CLIENT_ID:
         try:
             from google.oauth2 import id_token
             from google.auth.transport import requests as auth_requests
-            
             idinfo = id_token.verify_oauth2_token(credential, auth_requests.Request(), GOOGLE_CLIENT_ID)
             user_info = {
-                "id": idinfo.get('sub'),
+                "id": str(idinfo.get('sub')),
                 "email": idinfo.get('email'),
                 "name": idinfo.get('name', 'Google User'),
                 "picture": idinfo.get('picture', ''),
                 "role": "Researcher"
             }
         except Exception as e:
-            logger.warning(f"Google ID token verification failed: {e}. Falling back to simulation.")
+            logger.info(f"ID token verify skipped/failed: {e}")
             
+    # 2. Try fetching from Google UserInfo API (if Access Token is provided)
+    if not user_info:
+        try:
+            import requests as py_requests
+            resp = py_requests.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {credential}'},
+                timeout=5
+            )
+            if resp.status_code == 200:
+                u_data = resp.json()
+                user_info = {
+                    "id": str(u_data.get('sub', uuid.uuid4().hex)),
+                    "email": u_data.get('email'),
+                    "name": u_data.get('name', 'Google User'),
+                    "picture": u_data.get('picture', ''),
+                    "role": "Researcher"
+                }
+        except Exception as e:
+            logger.info(f"Google UserInfo API check skipped/failed: {e}")
+
+    # 3. Fallback JWT unverified decode
+    if not user_info and '.' in str(credential):
+        try:
+            import base64
+            parts = credential.split('.')
+            if len(parts) >= 2:
+                payload = parts[1]
+                payload += '=' * (-len(payload) % 4)
+                decoded = json.loads(base64.urlsafe_b64decode(payload).decode('utf-8'))
+                if 'email' in decoded:
+                    user_info = {
+                        "id": str(decoded.get('sub', uuid.uuid4().hex)),
+                        "email": decoded.get('email'),
+                        "name": decoded.get('name', 'Google User'),
+                        "picture": decoded.get('picture', ''),
+                        "role": "Researcher"
+                    }
+        except Exception as e:
+            logger.info(f"Base64 JWT payload decode failed: {e}")
+
+    if not user_info or not user_info.get('email'):
+        return error_response("Token Google tidak valid atau gagal diverifikasi.", 401)
+        
     conn = get_db_connection()
     db_user = conn.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],)).fetchone()
     if not db_user:
@@ -189,7 +227,7 @@ def auth_google():
             user_info['email'],
             user_info['name'],
             hash_password(uuid.uuid4().hex),
-            "NLP Research Center",
+            "Universitas Muhammadiyah Sumatera Utara",
             user_info['role'],
             user_info['picture']
         ))
@@ -197,7 +235,7 @@ def auth_google():
         db_user = conn.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],)).fetchone()
     conn.close()
     
-    user_info = {
+    user_session = {
         "id": str(db_user['id']),
         "email": db_user['email'],
         "name": db_user['name'],
@@ -206,8 +244,9 @@ def auth_google():
         "institution": db_user['institution']
     }
     
-    session['user'] = user_info
-    return success_response(user_info, "Google Login Successful")
+    session['user'] = user_session
+    logger.info(f"User logged in successfully via Google: {user_session['email']}")
+    return success_response(user_session, "Google Login Successful")
 
 @app.route('/api/v1/auth/login', methods=['POST'])
 def email_login():

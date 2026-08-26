@@ -467,22 +467,24 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 });
 
 // --- GOOGLE OAUTH 2.0 INTEGRATION ---
-window.handleGoogleCredentialResponse = function(response) {
-    if (!response || !response.credential) {
-        showToast("Gagal menerima token kredensial Google.", true);
-        return;
-    }
+let googleTokenClient = null;
+
+function sendGoogleTokenToBackend(credentialOrToken) {
+    if (!credentialOrToken) return;
     showLoader();
     fetch('/api/v1/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential })
+        body: JSON.stringify({ credential: credentialOrToken })
     })
     .then(res => res.json())
     .then(res => {
         if (res.success && res.data) {
             showToast("Berhasil masuk dengan Akun Google!");
             setAuthenticatedUser(res.data);
+            if (window.location.hash.includes('access_token') || window.location.hash.includes('id_token')) {
+                history.replaceState(null, '', '/dashboard');
+            }
         } else {
             showToast(res.error || "Gagal autentikasi dengan Google.", true);
         }
@@ -493,36 +495,75 @@ window.handleGoogleCredentialResponse = function(response) {
     .finally(() => {
         hideLoader();
     });
+}
+
+window.handleGoogleCredentialResponse = function(response) {
+    if (response && response.credential) {
+        sendGoogleTokenToBackend(response.credential);
+    }
 };
+
+function triggerGoogleSignInFlow() {
+    const clientId = window.GOOGLE_CLIENT_ID || '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com';
+    
+    if (googleTokenClient) {
+        googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+    } else if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: 'email profile openid',
+            callback: (tokenRes) => {
+                if (tokenRes && tokenRes.access_token) {
+                    sendGoogleTokenToBackend(tokenRes.access_token);
+                }
+            }
+        });
+        googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+    } else {
+        // Direct OAuth 2.0 redirect fallback
+        const redirectUri = window.location.origin;
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile%20openid&prompt=select_account`;
+        window.location.href = authUrl;
+    }
+}
 
 function initGoogleAuth() {
     const clientId = window.GOOGLE_CLIENT_ID || '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com';
-    if (window.google && window.google.accounts && window.google.accounts.id) {
+    
+    // Bind custom Google Sign-In button
+    const customBtn = document.getElementById('btn-custom-google-login');
+    if (customBtn && !customBtn.hasAttribute('data-bound')) {
+        customBtn.setAttribute('data-bound', 'true');
+        customBtn.addEventListener('click', triggerGoogleSignInFlow);
+    }
+
+    // Initialize Google OAuth2 Token Client
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
         try {
-            google.accounts.id.initialize({
+            googleTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
-                callback: window.handleGoogleCredentialResponse,
-                auto_select: false,
-                cancel_on_tap_outside: true
+                scope: 'email profile openid',
+                callback: (tokenRes) => {
+                    if (tokenRes && tokenRes.access_token) {
+                        sendGoogleTokenToBackend(tokenRes.access_token);
+                    }
+                }
             });
-            const btnContainer = document.getElementById('google-signin-btn-container');
-            if (btnContainer) {
-                btnContainer.innerHTML = '';
-                google.accounts.id.renderButton(btnContainer, {
-                    theme: 'outline',
-                    size: 'large',
-                    type: 'standard',
-                    shape: 'pill',
-                    text: 'signin_with',
-                    logo_alignment: 'left',
-                    width: 320
-                });
-            }
         } catch (e) {
-            console.warn("Google Sign-In initialization failed:", e);
+            console.warn("Google Token Client init notice:", e);
         }
     } else {
         setTimeout(initGoogleAuth, 500);
+    }
+
+    // Check if user redirected back with OAuth token in URL fragment
+    if (window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const idToken = hashParams.get('id_token');
+        if (accessToken || idToken) {
+            sendGoogleTokenToBackend(accessToken || idToken);
+        }
     }
 }
 
