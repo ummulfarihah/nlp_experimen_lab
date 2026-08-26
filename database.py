@@ -60,6 +60,22 @@ def db_session() -> Generator[sqlite3.Cursor, None, None]:
         conn.close()
 
 
+@contextmanager
+def db_read() -> Generator[sqlite3.Connection, None, None]:
+    """
+    Context manager for read-only database access.
+    Closes the connection on exit; does not commit (no writes expected).
+
+    Yields:
+        sqlite3.Connection: Active SQLite connection with Row factory configured.
+    """
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def hash_password(plain_password: str) -> str:
     """Hashes a plain text password using Werkzeug security PBKDF2/SHA256."""
     return generate_password_hash(plain_password, method='pbkdf2:sha256')

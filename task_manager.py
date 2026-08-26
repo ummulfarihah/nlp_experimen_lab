@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from config import resolve_db_path, LOGS_FOLDER
-from database import get_db_connection, db_session
+from database import get_db_connection, db_session, db_read
 from ml_engine import train_classical_model
 from bert_engine import train_bert_model
 
@@ -233,24 +233,43 @@ def _training_job_worker(
         check_cancellation(2, "Initialization")
 
         # Fetch split_config and random_seed from database
-        conn = get_db_connection()
-        job_info = conn.execute('''
-            SELECT e.split_config, e.random_seed 
-            FROM experiment_jobs j
-            JOIN experiments e ON j.experiment_id = e.id
-            WHERE j.id = ?
-        ''', (job_id,)).fetchone()
-
         split_config = None
         random_seed = 42
-        if job_info:
-            if job_info['split_config']:
-                try:
-                    split_config = json.loads(job_info['split_config'])
-                except Exception:
-                    pass
-            if job_info['random_seed'] is not None:
-                random_seed = int(job_info['random_seed'])
+        test_dataset_path = None
+        val_dataset_path = None
+        test_size = 0.2
+
+        with db_read() as conn:
+            job_info = conn.execute('''
+                SELECT e.split_config, e.random_seed 
+                FROM experiment_jobs j
+                JOIN experiments e ON j.experiment_id = e.id
+                WHERE j.id = ?
+            ''', (job_id,)).fetchone()
+
+            if job_info:
+                if job_info['split_config']:
+                    try:
+                        split_config = json.loads(job_info['split_config'])
+                    except Exception:
+                        pass
+                if job_info['random_seed'] is not None:
+                    random_seed = int(job_info['random_seed'])
+
+            if split_config:
+                if split_config.get("method") == "external":
+                    test_id = split_config.get("test_dataset_id")
+                    val_id = split_config.get("val_dataset_id")
+                    if test_id:
+                        row = conn.execute('SELECT filepath FROM datasets WHERE id = ?', (test_id,)).fetchone()
+                        if row:
+                            test_dataset_path = resolve_db_path(row['filepath'])
+                    if val_id:
+                        row = conn.execute('SELECT filepath FROM datasets WHERE id = ?', (val_id,)).fetchone()
+                        if row:
+                            val_dataset_path = resolve_db_path(row['filepath'])
+                else:
+                    test_size = float(split_config.get("test_size", 0.2))
 
         # Lock random seeds for 100% scientific reproducibility
         import random
@@ -269,26 +288,6 @@ def _training_job_worker(
                 torch.backends.cudnn.benchmark = False
         except ImportError:
             pass
-
-        test_dataset_path = None
-        val_dataset_path = None
-        test_size = 0.2
-
-        if split_config:
-            if split_config.get("method") == "external":
-                test_id = split_config.get("test_dataset_id")
-                val_id = split_config.get("val_dataset_id")
-                if test_id:
-                    row = conn.execute('SELECT filepath FROM datasets WHERE id = ?', (test_id,)).fetchone()
-                    if row:
-                        test_dataset_path = resolve_db_path(row['filepath'])
-                if val_id:
-                    row = conn.execute('SELECT filepath FROM datasets WHERE id = ?', (val_id,)).fetchone()
-                    if row:
-                        val_dataset_path = resolve_db_path(row['filepath'])
-            else:
-                test_size = float(split_config.get("test_size", 0.2))
-        conn.close()
 
         if test_dataset_path:
             db_log_event(job_id, "INFO", "SPLIT_CONFIG", f"Menggunakan dataset uji eksternal: {os.path.basename(test_dataset_path)}")

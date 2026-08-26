@@ -3,9 +3,10 @@ Integration tests for Flask API endpoints, authentication, and background tasks
 """
 
 import json
+import sqlite3
 import pytest
 from app import app
-from database import get_db_connection, init_db
+from database import db_read, db_session, init_db
 from task_manager import cancel_training_job, is_job_cancelled
 
 
@@ -82,6 +83,10 @@ def test_unauthenticated_access_blocked(client):
     res = client.post('/api/v1/predict/single', json={"job_id": 1, "text": "halo"})
     assert res.status_code == 401
 
+    # System Resources
+    res = client.get('/api/v1/system/resources')
+    assert res.status_code == 401
+
 
 def test_authenticated_access_allowed(auth_client):
     """Verifies that logged in users can access protected endpoints."""
@@ -108,8 +113,8 @@ def test_preprocess_api_empty_text(auth_client):
     assert data["success"] is False
 
 
-def test_system_resources_endpoint(client):
-    res = client.get('/api/v1/system/resources')
+def test_system_resources_endpoint_authenticated(auth_client):
+    res = auth_client.get('/api/v1/system/resources')
     assert res.status_code == 200
     data = json.loads(res.data)
     assert data["success"] is True
@@ -118,11 +123,31 @@ def test_system_resources_endpoint(client):
     assert "disk" in data["data"]
 
 
+def test_db_read_connection_closure():
+    """Verifies that db_read() context manager closes the connection on exit."""
+    conn_ref = None
+    with db_read() as conn:
+        conn_ref = conn
+        row = conn.execute("SELECT 1 as val").fetchone()
+        assert row["val"] == 1
+    # After exiting context manager, connection should be closed
+    with pytest.raises(sqlite3.ProgrammingError):
+        conn_ref.execute("SELECT 1")
+
+
+def test_repeated_read_requests_no_leak(auth_client):
+    """Verifies that repeated read requests execute cleanly without connection leaks."""
+    for _ in range(50):
+        res = auth_client.get('/api/v1/datasets')
+        assert res.status_code == 200
+        res2 = auth_client.get('/api/v1/system/resources')
+        assert res2.status_code == 200
+
+
 def test_database_driven_cancellation():
     """Verifies that cancel_training_job updates the DB flag and is_job_cancelled reads it."""
-    with get_db_connection() as conn:
+    with db_session() as cursor:
         # Create a mock experiment job
-        cursor = conn.cursor()
         cursor.execute("INSERT INTO model_configs (name, model_type, parameters, created_at) VALUES ('mock', 'nb', '{}', '2026-01-01')")
         mc_id = cursor.lastrowid
         cursor.execute(f"INSERT INTO datasets (name, filepath, file_hash, total_samples, class_distribution, uploaded_at) VALUES ('d', 'p', 'hash_{mc_id}', 10, '{{}}', '2026-01-01')")
@@ -131,7 +156,6 @@ def test_database_driven_cancellation():
         e_id = cursor.lastrowid
         cursor.execute(f"INSERT INTO experiment_jobs (experiment_id, status, started_at, progress, cancel_requested) VALUES ({e_id}, 'Training', '2026-01-01', 50, 0)")
         job_id = cursor.lastrowid
-        conn.commit()
 
     assert not is_job_cancelled(job_id)
 
@@ -141,15 +165,13 @@ def test_database_driven_cancellation():
     assert is_job_cancelled(job_id) is True
 
     # Cleanup
-    with get_db_connection() as conn:
-        conn.execute("DELETE FROM experiment_jobs WHERE id = ?", (job_id,))
-        conn.commit()
+    with db_session() as cursor:
+        cursor.execute("DELETE FROM experiment_jobs WHERE id = ?", (job_id,))
 
 
 def test_stale_job_recovery_on_init():
     """Verifies that init_db recovers zombie/interrupted training jobs."""
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    with db_session() as cursor:
         cursor.execute("INSERT INTO model_configs (name, model_type, parameters, created_at) VALUES ('mock2', 'svm', '{}', '2026-01-01')")
         mc_id = cursor.lastrowid
         cursor.execute(f"INSERT INTO datasets (name, filepath, file_hash, total_samples, class_distribution, uploaded_at) VALUES ('d2', 'p2', 'hash_stale_{mc_id}', 10, '{{}}', '2026-01-01')")
@@ -158,14 +180,13 @@ def test_stale_job_recovery_on_init():
         e_id = cursor.lastrowid
         cursor.execute(f"INSERT INTO experiment_jobs (experiment_id, status, started_at, progress) VALUES ({e_id}, 'Training', '2026-01-01', 30)")
         stale_job_id = cursor.lastrowid
-        conn.commit()
 
     # Run database initialization/recovery
     init_db()
 
-    with get_db_connection() as conn:
-        job = conn.execute("SELECT status, failure_reason FROM experiment_jobs WHERE id = ?", (stale_job_id,)).fetchone()
+    with db_session() as cursor:
+        cursor.execute("SELECT status, failure_reason FROM experiment_jobs WHERE id = ?", (stale_job_id,))
+        job = cursor.fetchone()
         assert job["status"] == "Failed"
         assert "Interrupted by server restart" in job["failure_reason"]
-        conn.execute("DELETE FROM experiment_jobs WHERE id = ?", (stale_job_id,))
-        conn.commit()
+        cursor.execute("DELETE FROM experiment_jobs WHERE id = ?", (stale_job_id,))
