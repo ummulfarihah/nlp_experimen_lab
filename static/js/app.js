@@ -852,7 +852,18 @@ function fetchDashboardSummary() {
                 list.innerHTML = '';
                 
                 if (jobs.length === 0) {
-                    list.innerHTML = '<div class="text-center py-6 text-rose-mauve text-xs">Belum ada eksperimen diluncurkan.</div>';
+                    list.innerHTML = `
+                        <div class="empty-state-content w-full my-2">
+                            <div class="empty-state-icon-wrap">
+                                <i data-lucide="flask-conical" class="w-6 h-6 text-pink"></i>
+                            </div>
+                            <p class="empty-state-title">Belum Ada Eksperimen Diluncurkan</p>
+                            <p class="empty-state-subtitle">Belum ada riwayat aktivitas pelatihan model. Silakan buka menu Model Training untuk meluncurkan eksperimen baru.</p>
+                        </div>
+                    `;
+                    if (window.lucide) {
+                        lucide.createIcons({ root: list });
+                    }
                     return;
                 }
                 
