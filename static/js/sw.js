@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ummu-nlp-lab-v103.0';
+const CACHE_NAME = 'ummu-nlp-lab-v104.0';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
