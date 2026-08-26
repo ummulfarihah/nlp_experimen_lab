@@ -24,7 +24,9 @@ except ImportError:
     HAS_TORCH_TRANSFORMERS = False
     DEVICE = "cpu"
 
-print(f"Deep Learning Engine Info: HAS_TORCH_TRANSFORMERS={HAS_TORCH_TRANSFORMERS}, DEVICE={DEVICE}")
+import logging
+logger = logging.getLogger('nlp_lab.bert_engine')
+logger.info(f"Deep Learning Engine Info: HAS_TORCH_TRANSFORMERS={HAS_TORCH_TRANSFORMERS}, DEVICE={DEVICE}")
 
 if HAS_TORCH_TRANSFORMERS:
     class IndonesianTextDataset(Dataset):

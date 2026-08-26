@@ -9,23 +9,25 @@ except Exception:
 import uuid
 import json
 import psutil
+import logging
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 from config import (
-    resolve_db_path,
+    resolve_db_path, setup_logging,
     BASE_DIR, UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATARS_FOLDER,
-    SQLALCHEMY_DATABASE_URI, GOOGLE_CLIENT_ID, SECRET_KEY, PORT
+    SQLALCHEMY_DATABASE_URI, GOOGLE_CLIENT_ID, SECRET_KEY, PORT, MAX_CONTENT_LENGTH
 )
-from database import get_db_connection, init_db
+from database import get_db_connection, db_session, init_db, hash_password, verify_password
 from ml_engine import (
     compute_dataset_hash, analyze_dataset_file, preprocess_text_step_by_step, 
-    run_mcnemar_test
+    run_mcnemar_test, load_model_artifact
 )
 from bert_engine import predict_sample, preprocess_bert_step_by_step
 from task_manager import (
-    start_training_job_async, cancel_training_job, create_job_log_file_path, db_log_event
+    start_training_job_async, cancel_training_job, create_job_log_file_path, db_log_event, ACTIVE_JOBS
 )
 
 import pandas as pd
@@ -35,7 +37,11 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 CORS(app)
+
+# Initialize production logging
+logger = setup_logging(app)
 
 # Create folders if not exists
 for folder in [UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATARS_FOLDER]:
@@ -115,6 +121,28 @@ def index(path=None):
         return jsonify({"success": False, "error": "Not Found"}), 404
     return render_template('index.html')
 
+@app.route('/api/v1/health', methods=['GET'])
+def health_check():
+    """
+    Production health check probe returning DB connectivity, active jobs,
+    and server status.
+    """
+    db_ok = False
+    try:
+        with db_session() as cursor:
+            cursor.execute('SELECT 1')
+            db_ok = True
+    except Exception as e:
+        logger.error(f"Health check DB error: {e}")
+
+    return jsonify({
+        "status": "healthy" if db_ok else "unhealthy",
+        "version": "2.0.0",
+        "database": "connected" if db_ok else "error",
+        "active_jobs_count": len(ACTIVE_JOBS),
+        "timestamp": datetime.now().isoformat()
+    }), 200 if db_ok else 503
+
 # --- AUTH API ---
 @app.route('/api/v1/auth/google', methods=['POST'])
 def auth_google():
@@ -125,9 +153,6 @@ def auth_google():
     if not credential:
         return error_response("Token credential is required.")
         
-    # Standard Google Auth validation
-    # If the user has a client ID configured, we can try to verify.
-    # Otherwise, or as fallback/simulation, we decode/simulate a gorgeous profile.
     user_info = {
         "id": "10839218209382109",
         "email": "researcher@nlplab.org",
@@ -136,15 +161,12 @@ def auth_google():
         "role": "Lead Scientist"
     }
     
-    # In case the credential is a real JWT and we can verify it, we would use google-auth
     if GOOGLE_CLIENT_ID:
         try:
             from google.oauth2 import id_token
             from google.auth.transport import requests as auth_requests
             
-            # Verify token
             idinfo = id_token.verify_oauth2_token(credential, auth_requests.Request(), GOOGLE_CLIENT_ID)
-            
             user_info = {
                 "id": idinfo.get('sub'),
                 "email": idinfo.get('email'),
@@ -153,10 +175,8 @@ def auth_google():
                 "role": "Researcher"
             }
         except Exception as e:
-            # If real ID fails but client is testing, log warning and let them fall back
-            print(f"Google ID token verification failed: {e}. Falling back to simulation.")
+            logger.warning(f"Google ID token verification failed: {e}. Falling back to simulation.")
             
-    # Check if this user exists in DB, if not insert, otherwise fetch updated info
     conn = get_db_connection()
     db_user = conn.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],)).fetchone()
     if not db_user:
@@ -167,8 +187,8 @@ def auth_google():
         ''', (
             user_info['email'],
             user_info['name'],
-            "", # No password for Google SSO
-            "NLP Research Center", # Default institution
+            hash_password(uuid.uuid4().hex),
+            "NLP Research Center",
             user_info['role'],
             user_info['picture']
         ))
@@ -176,7 +196,6 @@ def auth_google():
         db_user = conn.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],)).fetchone()
     conn.close()
     
-    # Store complete db info in session
     user_info = {
         "id": str(db_user['id']),
         "email": db_user['email'],
@@ -186,16 +205,15 @@ def auth_google():
         "institution": db_user['institution']
     }
     
-    # Set session
     session['user'] = user_info
     return success_response(user_info, "Google Login Successful")
 
 @app.route('/api/v1/auth/login', methods=['POST'])
 def email_login():
-    """Fallback standard authentication for NLP Experiment Lab."""
+    """Secure password authentication for NLP Experiment Lab."""
     data = request.json or {}
-    email = data.get('email')
-    password = data.get('password')
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
     
     if not email or not password:
         return error_response("Email and password are required.")
@@ -204,7 +222,7 @@ def email_login():
     user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
     conn.close()
     
-    if user and user['password'] == password:
+    if user and verify_password(password, user['password']):
         user_info = {
             "id": str(user['id']),
             "email": user['email'],
@@ -214,9 +232,11 @@ def email_login():
             "institution": user['institution']
         }
         session['user'] = user_info
+        logger.info(f"Successful login for user {email}")
         return success_response(user_info, "Login Successful")
     else:
-        return error_response("Email atau Kata Sandi administrator salah.")
+        logger.warning(f"Failed login attempt for email: {email}")
+        return error_response("Email atau Kata Sandi administrator salah.", 401)
 
 @app.route('/api/v1/auth/logout', methods=['POST'])
 def logout():
@@ -293,11 +313,14 @@ def change_password():
         return error_response("Unauthorized", 401)
         
     data = request.json or {}
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
     
     if not current_password or not new_password:
         return error_response("Kata sandi lama dan baru harus diisi.")
+        
+    if len(new_password) < 6:
+        return error_response("Kata sandi baru minimal 6 karakter.")
         
     conn = get_db_connection()
     db_user = conn.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone()
@@ -306,14 +329,15 @@ def change_password():
         conn.close()
         return error_response("Pengguna tidak ditemukan.", 404)
         
-    if db_user['password'] != current_password:
+    if not verify_password(current_password, db_user['password']):
         conn.close()
-        return error_response("Kata sandi lama yang Anda masukkan salah.")
+        return error_response("Kata sandi lama yang Anda masukkan salah.", 400)
         
-    conn.execute('UPDATE users SET password = ? WHERE id = ?', (new_password, user['id']))
+    conn.execute('UPDATE users SET password = ? WHERE id = ?', (hash_password(new_password), user['id']))
     conn.commit()
     conn.close()
     
+    logger.info(f"Password updated for user {user['id']}")
     return success_response(message="Kata sandi berhasil diubah.")
 
 @app.route('/api/v1/auth/avatar', methods=['POST'])
@@ -384,17 +408,19 @@ def upload_dataset():
         return error_response("No file provided.")
         
     file = request.files['file']
-    if file.filename == '':
-        return error_response("Selected file is empty.")
+    raw_name = file.filename or ''
+    if raw_name == '':
+        return error_response("Berkas yang dipilih kosong.")
         
-    if not file.filename.endswith('.csv'):
-        return error_response("Dataset must be in CSV format.")
+    clean_name = secure_filename(raw_name)
+    if not clean_name.lower().endswith('.csv'):
+        return error_response("Format dataset harus berupa file .CSV.")
         
     # Generate unique filename to avoid collision
-    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    unique_filename = f"{uuid.uuid4().hex[:12]}_{clean_name}"
     save_path = os.path.join(DATASETS_FOLDER, unique_filename)
     
-    # Save temporary
+    # Save file
     file.save(save_path)
     
     try:
@@ -1041,14 +1067,13 @@ def predict_single():
         return error_response("Completed model artifact not found.", 404)
         
     try:
-        # Load pickled model
-        with open(job['model_artifact_path'], 'rb') as f:
-            model_package = pickle.load(f)
-            
+        artifact_path = resolve_db_path(job['model_artifact_path'])
+        model_package = load_model_artifact(artifact_path)
         prediction = predict_sample(model_package, text)
         return success_response(prediction)
         
     except Exception as e:
+        logger.error(f"Single prediction error: {e}")
         return error_response(f"Prediction failed: {e}")
 
 @app.route('/api/v1/predict/batch', methods=['POST'])
@@ -1075,14 +1100,21 @@ def predict_batch():
         return error_response("Completed model artifact not found.", 404)
         
     try:
-        # Load model package
-        with open(job['model_artifact_path'], 'rb') as f:
-            model_package = pickle.load(f)
+        artifact_path = resolve_db_path(job['model_artifact_path'])
+        model_package = load_model_artifact(artifact_path)
             
-        # Read batch file
-        df = pd.read_csv(file)
+        # Read batch file with encoding fallback
+        try:
+            df = pd.read_csv(file, encoding='utf-8')
+        except UnicodeDecodeError:
+            file.seek(0)
+            df = pd.read_csv(file, encoding='latin-1')
+
         if 'text' not in df.columns:
             return error_response("CSV file must contain a 'text' column.")
+
+        if len(df) > 5000:
+            return error_response("Ukuran berkas batch maksimal 5.000 baris per transaksi.")
             
         # Run prediction
         predictions = []
