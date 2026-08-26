@@ -375,7 +375,6 @@ function handleViewActivated(viewId) {
 
 // --- AUTHENTICATION & LOGIN INTERACTION ---
 function checkAuthentication() {
-    showLoader();
     fetch('/api/v1/auth/me')
         .then(res => res.json())
         .then(res => {
@@ -389,7 +388,7 @@ function checkAuthentication() {
             showLoginOverlay();
         })
         .finally(() => {
-            hideLoader();
+            hideAppSplash();
         });
 }
 
@@ -2597,15 +2596,17 @@ window.addEventListener('hashchange', () => {
     }
 });
 
-// Sidebar link click handling for clean SPA transitions
+// Unified SPA link click handling for desktop sidebar, mobile bottom nav, and mobile sheet
 document.addEventListener('click', (e) => {
-    const menuLink = e.target.closest('.sidebar-menu a.menu-item');
-    if (menuLink) {
-        e.preventDefault();
-        const href = menuLink.getAttribute('href') || '';
-        const viewId = href.replace(/^[\/#]+/, '');
-        if (viewId) {
-            navigateToView(viewId, true);
+    const spaLink = e.target.closest('.sidebar-menu a.menu-item, a.sidebar-logo-link, .mobile-bottom-bar a.mobile-nav-item, .mobile-sheet-grid a.mobile-sheet-card, a[data-spa]');
+    if (spaLink) {
+        const href = spaLink.getAttribute('href') || '';
+        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith('#') && !spaLink.hasAttribute('target')) {
+            e.preventDefault();
+            const viewId = href.replace(/^[\/#]+/, '');
+            if (viewId) {
+                navigateToView(viewId, true);
+            }
         }
     }
 });
@@ -3026,11 +3027,9 @@ function hideAppSplash() {
     }
 }
 
-window.addEventListener('load', () => {
-    setTimeout(hideAppSplash, 400);
-});
-// Fallback safety timer to ensure splash never hangs
-setTimeout(hideAppSplash, 1500);
+// Fallback safety timer to ensure splash screen never hangs if network is slow
+setTimeout(hideAppSplash, 2500);
+
 
 
 
