@@ -1,5 +1,23 @@
 /* NLP EXPERIMENT LAB - APPLICATION LOGIC & ROUTER (app.js) */
 
+// Global fetch interceptor to attach ngrok-skip-browser-warning header
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(input, init = {}) {
+        init = init || {};
+        if (!init.headers) {
+            init.headers = { 'ngrok-skip-browser-warning': 'true' };
+        } else if (init.headers instanceof Headers) {
+            init.headers.set('ngrok-skip-browser-warning', 'true');
+        } else if (Array.isArray(init.headers)) {
+            init.headers.push(['ngrok-skip-browser-warning', 'true']);
+        } else if (typeof init.headers === 'object') {
+            init.headers['ngrok-skip-browser-warning'] = 'true';
+        }
+        return originalFetch(input, init);
+    };
+})();
+
 // Global App State
 const STATE = {
     user: null,

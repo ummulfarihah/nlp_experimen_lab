@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ummu-nlp-lab-v115.0';
+const CACHE_NAME = 'ummu-nlp-lab-v116.0';
 const OFFLINE_URL = '/static/offline.html';
 
 const STATIC_ASSETS = [
@@ -63,10 +63,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Create request with ngrok-skip-browser-warning header
+  let req = event.request;
+  try {
+    const headers = new Headers(event.request.headers);
+    headers.set('ngrok-skip-browser-warning', 'true');
+    req = new Request(event.request, { headers });
+  } catch (e) {
+    req = event.request;
+  }
+
   // 1. Navigation / HTML Document Requests: Network-First with Offline Fallback
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
-      fetch(event.request)
+      fetch(req)
         .then((networkResponse) => {
           // If server is healthy (200), cache it and return
           if (networkResponse && networkResponse.status === 200) {
@@ -100,7 +110,7 @@ self.addEventListener('fetch', (event) => {
   // 2. Static Assets (CSS, JS, Images, Fonts): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+      const fetchPromise = fetch(req).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
