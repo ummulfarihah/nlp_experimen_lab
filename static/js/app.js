@@ -2484,6 +2484,118 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuthentication();
 });
 
+// --- BACKEND HEALTH CHECK & SERVER OFFLINE INTERCEPTOR ---
+let isBackendOnline = true;
+let healthCheckTimer = null;
+let isHealthCheckRunning = false;
+
+function setBackendOnlineStatus(online) {
+    const banner = document.getElementById('server-offline-banner');
+    
+    if (!online) {
+        if (isBackendOnline) {
+            isBackendOnline = false;
+            if (banner) banner.classList.remove('hidden');
+            startAggressiveHealthCheck();
+        }
+    } else {
+        if (!isBackendOnline) {
+            isBackendOnline = true;
+            if (banner) banner.classList.add('hidden');
+            showToast("Terhubung kembali ke Server AI!", false);
+            // Refresh current view data automatically
+            const currentView = STATE.currentView || getViewFromPath();
+            handleViewActivated(currentView);
+        } else {
+            if (banner && !banner.classList.contains('hidden')) {
+                banner.classList.add('hidden');
+            }
+        }
+    }
+}
+
+async function checkBackendHealth() {
+    if (isHealthCheckRunning) return isBackendOnline;
+    isHealthCheckRunning = true;
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await originalFetch('/api/v1/system/resources?_t=' + Date.now(), {
+            method: 'GET',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (res.ok) {
+            setBackendOnlineStatus(true);
+            isHealthCheckRunning = false;
+            return true;
+        } else {
+            setBackendOnlineStatus(false);
+            isHealthCheckRunning = false;
+            return false;
+        }
+    } catch (e) {
+        setBackendOnlineStatus(false);
+        isHealthCheckRunning = false;
+        return false;
+    }
+}
+
+function startAggressiveHealthCheck() {
+    if (healthCheckTimer) clearInterval(healthCheckTimer);
+    healthCheckTimer = setInterval(async () => {
+        const healthy = await checkBackendHealth();
+        if (healthy && healthCheckTimer) {
+            clearInterval(healthCheckTimer);
+            healthCheckTimer = null;
+        }
+    }, 6000);
+}
+
+async function triggerManualHealthCheck(btnElement) {
+    if (btnElement) {
+        btnElement.classList.add('checking');
+        const textSpan = btnElement.querySelector('span');
+        if (textSpan) textSpan.textContent = 'Memeriksa...';
+    }
+    
+    const isOnline = await checkBackendHealth();
+    
+    if (btnElement) {
+        btnElement.classList.remove('checking');
+        const textSpan = btnElement.querySelector('span');
+        if (textSpan) textSpan.textContent = isOnline ? 'Terhubung!' : 'Cek Koneksi';
+    }
+}
+
+window.triggerManualHealthCheck = triggerManualHealthCheck;
+window.setBackendOnlineStatus = setBackendOnlineStatus;
+
+// Global Fetch Interceptor for API Calls
+const originalFetch = window.fetch;
+window.fetch = async function(...args) {
+    try {
+        const response = await originalFetch.apply(this, args);
+        const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+        
+        if (urlStr.includes('/api/')) {
+            if (response.status >= 500) {
+                setBackendOnlineStatus(false);
+            } else if (response.status === 200) {
+                setBackendOnlineStatus(true);
+            }
+        }
+        return response;
+    } catch (error) {
+        const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+        if (urlStr.includes('/api/')) {
+            setBackendOnlineStatus(false);
+        }
+        throw error;
+    }
+};
+
 // --- PWA SERVICE WORKER & AUTO INSTALL PROMPT ENGINE ---
 let deferredInstallPrompt = null;
 let pwaPromptShownThisSession = false;

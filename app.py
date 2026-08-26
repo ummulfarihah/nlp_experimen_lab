@@ -104,6 +104,10 @@ def pwa_service_worker():
 def favicon():
     return send_from_directory('static/img', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/offline')
+def offline():
+    return send_from_directory('static', 'offline.html')
+
 @app.route('/')
 @app.route('/<path:path>')
 def index(path=None):

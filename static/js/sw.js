@@ -1,6 +1,10 @@
-const CACHE_NAME = 'ummu-nlp-lab-v104.0';
+const CACHE_NAME = 'ummu-nlp-lab-v105.0';
+const OFFLINE_URL = '/static/offline.html';
+
 const STATIC_ASSETS = [
   '/',
+  '/offline',
+  '/static/offline.html',
   '/manifest.json',
   '/static/css/style.css',
   '/static/js/app.js',
@@ -16,7 +20,7 @@ const STATIC_ASSETS = [
   '/static/img/apple-touch-icon.png'
 ];
 
-// Install Event - Pre-cache core shell & immediately activate without waiting
+// Install Event - Pre-cache core shell & offline page, immediately activate without waiting
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -59,19 +63,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. Navigation / HTML Document Requests: Network-First (Guarantees freshest updates)
+  // 1. Navigation / HTML Document Requests: Network-First with Offline Fallback
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
+          // If server is healthy (200), cache it and return
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+            return networkResponse;
           }
+          
+          // If server returns gateway/tunnel error (502, 503, 504 from Ngrok when Colab is offline)
+          if (networkResponse && networkResponse.status >= 500) {
+            return caches.match(OFFLINE_URL).then((offlineRes) => {
+              return offlineRes || networkResponse;
+            });
+          }
+
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(event.request).then((cached) => cached || caches.match('/'));
+          // Network failed (offline / host unreachable) -> serve cached page or offline fallback
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            return caches.match(OFFLINE_URL).then((offlineRes) => {
+              return offlineRes || caches.match('/');
+            });
+          });
         })
     );
     return;
