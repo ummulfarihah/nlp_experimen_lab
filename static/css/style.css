@@ -5859,6 +5859,30 @@ select.form-select option:disabled,
 /* ==========================================================================
    GOOGLE OAUTH SIGN-IN BUTTON STYLING (PROPORTIONAL GLASSMORPHISM)
    ========================================================================== */
+.login-divider {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    margin: 20px 0 16px 0 !important;
+}
+
+.login-divider-line {
+    flex: 1 !important;
+    height: 1px !important;
+    background: rgba(255, 123, 167, 0.22) !important;
+    border: none !important;
+}
+
+.login-divider-text {
+    padding: 0 14px !important;
+    font-size: 0.6875rem !important;
+    font-weight: 700 !important;
+    color: var(--rose-mauve, #A85A7E) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+}
+
 .btn-google-login {
     display: inline-flex !important;
     align-items: center !important;
