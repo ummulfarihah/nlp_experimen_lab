@@ -433,7 +433,10 @@ function setAuthenticatedUser(user) {
     document.getElementById('user-display-name').textContent = user.name;
     document.getElementById('user-display-role').textContent = user.role || 'Researcher';
     if (user.picture) {
-        document.getElementById('user-avatar').src = user.picture;
+        const userAvatar = document.getElementById('user-avatar');
+        if (userAvatar) userAvatar.src = user.picture;
+        const profileDisplayAvatar = document.getElementById('profile-display-avatar');
+        if (profileDisplayAvatar) profileDisplayAvatar.src = user.picture;
     }
     
     hideLoginOverlay();

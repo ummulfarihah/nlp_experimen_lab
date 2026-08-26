@@ -257,6 +257,21 @@ def auth_google():
             ))
             cursor.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],))
             db_user = cursor.fetchone()
+        else:
+            # Automatically synchronize Google avatar and profile details to existing account
+            update_fields = []
+            params = []
+            if user_info.get('picture'):
+                update_fields.append('picture = ?')
+                params.append(user_info['picture'])
+            if user_info.get('name') and (db_user['name'] in ('Google User', 'Administrator', '') or not db_user['name']):
+                update_fields.append('name = ?')
+                params.append(user_info['name'])
+            if update_fields:
+                params.append(db_user['id'])
+                cursor.execute(f"UPDATE users SET {', '.join(update_fields)} WHERE id = ?", tuple(params))
+                cursor.execute('SELECT * FROM users WHERE id = ?', (db_user['id'],))
+                db_user = cursor.fetchone()
     
     user_session = {
         "id": str(db_user['id']),
