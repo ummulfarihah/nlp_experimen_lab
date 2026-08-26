@@ -1,117 +1,307 @@
-# NLP Experiment Lab (NLP Research Center)
+# Ummu NLP Experiment Lab (NLP Research Center)
+### *A Scientific & Experimental Research Platform for Indonesian Text Classification Benchmark*
 
-NLP Experiment Lab adalah platform penelitian berbasis web untuk mengelola dataset, melakukan preprocessing, melatih model klasifikasi teks, melakukan evaluasi, membandingkan hasil secara statistik (McNemar Test), dan melakukan prediksi.
-
-Aplikasi ini mendukung tiga algoritma klasifikasi teks utama untuk bahasa Indonesia:
-1. **Multinomial Naive Bayes (Klasikal)**
-2. **Support Vector Machine (SVM) (Klasikal)**
-3. **IndoBERT (Deep Learning / Fine-Tuning)**
-
----
-
-## 🚀 Fitur Utama
-
-- **Dataset Management:** Unggah CSV (kolom wajib: `text` dan `label`), kalkulasi statistik data, visualisasi sebaran kelas, dan hashing otomatis (SHA256) untuk audit penelitian.
-- **Preprocessing Lab:** Case folding, tokenization, normalisasi slang words (*slang words dictionary*), dan seleksi stopword bahasa Indonesia (tanpa proses stemming untuk menjaga keutuhan struktur kata).
-- **Asynchronous Training:** Proses pelatihan berjalan di latar belakang (*background thread worker*) sehingga UI tidak membeku. Dilengkapi kemampuan memantau progres log secara real-time (*live training logs*) dan fitur pembatalan (*cancellation*).
-- **Evaluation Lab:** Perhitungan metrik evaluasi standar secara macro (Accuracy, Precision, Recall, Macro F1), Confusion Matrix, dan Classification Report per kelas.
-- **McNemar Statistical Test:** Pengujian signifikansi statistik untuk membandingkan performa dua model klasifikasi secara objektif.
-- **Prediction Lab:** Pengujian prediksi model teraktivasi baik untuk masukan tunggal (*single*) maupun massal (*batch*).
-- **Resource Monitoring:** Pemantauan real-time penggunaan CPU, RAM, Disk, serta CUDA GPU (NVIDIA L4) menggunakan `psutil` dan `pynvml`.
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/framework-Flask%203.0+-green.svg)](https://flask.palletsprojects.com/)
+[![Deep Learning](https://img.shields.io/badge/model-IndoBERT%20%7C%20PyTorch%20%7C%20Transformers-red.svg)](https://huggingface.co/indobenchmark/indobert-base-p1)
+[![Machine Learning](https://img.shields.io/badge/ML-Scikit--Learn-orange.svg)](https://scikit-learn.org/)
+[![Database](https://img.shields.io/badge/database-SQLite3%20(WAL%20Mode)-lightgrey.svg)](https://www.sqlite.org/)
+[![Tests](https://img.shields.io/badge/tests-24%2F24%20passing%20(100%25)-brightgreen.svg)](https://pytest.org/)
+[![Institution](https://img.shields.io/badge/Institution-Universitas%20Muhammadiyah%20Sumatera%20Utara-blue.svg)](https://umsu.ac.id/)
 
 ---
 
-## 🛠️ Persyaratan Sistem (System Requirements)
+## 📌 Ringkasan Akademik & Abstrak Proyek
 
-- **Sistem Operasi:** Windows / Linux / macOS (Windows / Linux sangat direkomendasikan untuk dukungan CUDA GPU)
-- **Python Version:** Python 3.10 ke atas
-- **Hardware (Wajib untuk IndoBERT):** Kartu Grafis NVIDIA dengan CUDA untuk fine-tuning IndoBERT (misal: NVIDIA L4 GPU). Jika CUDA tidak tersedia, sistem akan melempar kesalahan (RuntimeError) jika Anda meluncurkan pelatihan IndoBERT, sedangkan Naive Bayes dan SVM tetap dapat berjalan normal di CPU.
+**Ummu NLP Experiment Lab** adalah platform laboratorium komputasi berbasis web yang dirancang secara terstandar untuk memfasilitasi penelitian empiris dan pengujian komparatif algoritma Pemrosesan Bahasa Alami (*Natural Language Processing*) pada korpus teks bahasa Indonesia. 
+
+Platform ini mengintegrasikan seluruh tahapan metodologi penelitian NLP ke dalam satu antarmuka terpadu (*Single Page Application*), mulai dari:
+1. **Manajemen Korpus & Audit Integritas Data** (*Dataset Manager* dengan verifikasi *hashing* kriptografis SHA-256).
+2. **Pipelines Rekayasa Teks Multi-Tahap** (*Preprocessing Lab*: *Case Folding*, *Noise & Punctuation Filtering*, *Dictionary-Based Slang Word Normalization*, dan *Selective Stopword Removal*).
+3. **Pemodelan Komparatif Multi-Paradigma**:
+   - **Model Klasikal Berbasis Frekuensi N-Gram**: *Multinomial Naive Bayes* (MNB) dan *Support Vector Machine* (SVM) dengan pembobotan *Term Frequency-Inverse Document Frequency* (TF-IDF).
+   - **Model Kontekstual *Transformer Deep Pre-trained Language Model***: *IndoBERT Base* (`indobenchmark/indobert-base-p1`) yang dioptimasi melalui *Fine-Tuning* menggunakan *AdamW Optimizer* dan *Linear Warmup Learning Rate Scheduler*.
+4. **Evaluasi Empiris Komprehensif** (*Macro Precision, Macro Recall, Macro F1-Score, Accuracy, Multi-Class Confusion Matrix*, dan *Per-Class Metric Decomposition*).
+5. **Uji Validasi Hipotesis Statistik** (*McNemar’s Statistical Significance Test* dengan tabel kontingensi $2\times 2$ untuk membuktikan signifikansi perbedaan performa antar model secara objektif).
+6. **Inferensi & *Prediction Lab*** (*Single Text Inference* dan *Batch Inference CSV* dengan visualisasi sebaran probabilitas kelas).
 
 ---
 
-## 📦 Panduan Instalasi & Penggunaan
+## 🏛️ Landasan Teori & Formulasi Matematis
 
-### 1. Klon Repositori dan Masuk ke Direktori
+### 1. Ekstraksi Fitur: TF-IDF (*Term Frequency-Inverse Document Frequency*)
+Untuk model klasikal (Naive Bayes dan SVM), teks ditransformasikan ke dalam representasi ruang vektor menggunakan skema pembobotan TF-IDF:
+$$\text{TF-IDF}(t, d, D) = \text{TF}(t, d) \times \text{IDF}(t, D)$$
+$$\text{IDF}(t, D) = \ln\left(\frac{1 + |D|}{1 + |\{d \in D : t \in d\}|}\right) + 1$$
+Di mana $|D|$ adalah total dokumen dalam korpus latih, dan $|\{d \in D : t \in d\}|$ adalah jumlah dokumen yang memuat term $t$.
+
+### 2. Algoritma Multinomial Naive Bayes
+Klasifikasi probabilistik berdasarkan Teorema Bayes dengan asumsi independensi fitur bersyarat:
+$$P(c|d) \propto P(c) \prod_{i=1}^{n} P(t_i | c)$$
+$$P(t_i | c) = \frac{N_{ci} + \alpha}{N_c + \alpha |V|}$$
+Di mana $\alpha$ merupakan parameter *Laplace Smoothing* ($\alpha = 1.0$), $N_{ci}$ adalah frekuensi kemunculan term $t_i$ pada kelas $c$, $N_c$ adalah total term pada kelas $c$, dan $|V|$ adalah ukuran vokabulari.
+
+### 3. Support Vector Machine (SVM)
+Optimasi bidang pemisah (*hyperplane*) dengan memaksimumkan *margin* geometris:
+$$\min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2} \|\mathbf{w}\|^2 + C \sum_{i=1}^{N} \xi_i$$
+$$\text{s.t.} \quad y_i (\mathbf{w}^T \phi(\mathbf{x}_i) + b) \ge 1 - \xi_i, \quad \xi_i \ge 0$$
+Di mana $C > 0$ mengatur penalti kesalahan klasifikasi (*slack variable* $\xi_i$), dan $\phi(\mathbf{x})$ memetakan vektor fitur melalui fungsi kernel (Linear atau *Radial Basis Function* / RBF).
+
+### 4. IndoBERT (*Bidirectional Encoder Representations from Transformers*)
+Arsitektur *deep bidirectional Transformer encoder* 12-layer dengan *multi-head self-attention*:
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+Vektor representasi token `[CLS]` pada layer terakhir dihubungkan ke *Classification Head* (Linear layer + Softmax) dan dioptimasi menggunakan fungsi kerugian *Cross-Entropy Loss*:
+$$\mathcal{L}_{CE} = -\sum_{c=1}^{K} y_c \log(\hat{y}_c)$$
+
+### 5. Uji Signifikansi Statistik McNemar
+Pengujian komparasi non-parametrik berpasangan pada sampel uji yang sama:
+$$\chi^2 = \frac{(|n_{01} - n_{10}| - 1)^2}{n_{01} + n_{10}}$$
+Di mana $n_{01}$ adalah jumlah data yang diprediksi benar oleh Model A namun salah oleh Model B, sedangkan $n_{10}$ adalah data yang salah oleh Model A namun benar oleh Model B. Jika $p\text{-value} < 0.05$ ($\alpha = 5\%$), hipotesis nol ($H_0$) ditolak, membuktikan perbedaan performa kedua model adalah signifikan secara statistik.
+
+---
+
+## 🔬 Arsitektur Sistem & Alur Kerja Penelitian
+
+```mermaid
+flowchart TD
+    A[Dataset CSV Mentah] -->|SHA-256 Hashing| B[Dataset Manager]
+    B --> C[Preprocessing Pipeline]
+    
+    subgraph Preprocessing_Module [Modul Preprocessing]
+        C --> C1[1. Case Folding]
+        C1 --> C2[2. Noise & Punctuation Removal]
+        C2 --> C3[3. Slang Word Normalization]
+        C3 --> C4[4. Selective Stopword Removal]
+    end
+
+    C4 --> D1[Klasikal: TF-IDF Vectorizer]
+    C4 --> D2[IndoBERT: WordPiece Tokenizer]
+
+    subgraph Model_Training [Laboratorium Pelatihan Model]
+        D1 --> E1[Multinomial Naive Bayes]
+        D1 --> E2[Support Vector Machine]
+        D2 --> E3[IndoBERT Fine-Tuning]
+    end
+
+    E1 --> F[Model Registry & Evaluator]
+    E2 --> F
+    E3 --> F
+
+    subgraph Evaluation_Metrics [Modul Evaluasi & Validasi]
+        F --> G1[Confusion Matrix & Classification Report]
+        F --> G2[Macro F1, Precision, Recall, Accuracy]
+        F --> G3[McNemar Statistical Significance Test]
+    end
+
+    F --> H[Prediction Lab - Single & Batch CSV Inference]
+```
+
+---
+
+## 🌟 Fitur Utama Platform
+
+| Modul | Deskripsi Fungsional Ilmiah |
+|---|---|
+| **Dataset Management** | Validasi skema CSV (`text`, `label`), kalkulasi distribusi kelas, inspeksi baris data, dan pencatatan *hash* SHA-256 untuk memastikan integritas data (*scientific data integrity*). |
+| **Preprocessing Lab** | Eksekusi langkah-demi-langkah pembersihan teks bahasa Indonesia dengan visualisasi tabel perbandingan kata sebelum vs sesudah normalisasi. |
+| **Asynchronous Training** | Pelatihan model berjalan pada *background thread worker* non-blocking. Dilengkapi *live console log streamer*, progres kalkulasi *real-time*, dan mekanisme *cancellation*. |
+| **Model Registry** | Manajemen siklus hidup berkas biner model terlatih (`.pkl` dan `.pt`), pencatatan *metadata* lingkungan komputasi, dan kontrol versi model. |
+| **Evaluation Lab** | Visualisasi grafik batang ApexCharts terintegrasi, visualisasi *heatmap* matriks kontingensi, dan perbandingan performa menyeluruh. |
+| **McNemar Statistical Test** | Analisis signifikansi statistik otomatis dengan pembentukan matriks kontingensi $2\times 2$, nilai derajat kebebasan ($df=1$), dan interpretasi otomatis $p\text{-value}$. |
+| **Prediction Lab** | Pengujian inferensi langsung untuk teks interaktif maupun inferensi massal melalui berkas CSV dengan *download report*. |
+| **Hardware & Resource Monitor** | Pemantauan berkala penggunaan CPU, RAM, Disk Storage, dan GPU VRAM (NVIDIA L4 / T4 via NVML) secara *real-time*. |
+| **Security & Access Control** | Autentikasi Google OAuth 2.0 dengan **Email Whitelist Check** (`ALLOWED_GOOGLE_EMAILS`), hashing sandi PBKDF2/SHA256, dan perlindungan sesi. |
+| **PWA & Offline Resilience** | Dukungan *Progressive Web App* (PWA) dengan *Service Worker caching* dan *offline fallback screen*. |
+
+---
+
+## 🛠️ Persyaratan Sistem (*System Requirements*)
+
+| Komponen | Spesifikasi Minimum | Rekomendasi untuk Pelatihan IndoBERT |
+|---|---|---|
+| **Sistem Operasi** | Windows 10/11 (64-bit) / Ubuntu 22.04 LTS / macOS | Ubuntu 22.04 LTS / Windows 11 Pro |
+| **Python Runtime** | Python 3.10 atau 3.11 / 3.12 / 3.13 | Python 3.10 atau 3.11 |
+| **RAM** | 8 GB RAM | 16 GB RAM atau lebih |
+| **Penyimpanan** | 5 GB ruang kosong (SSD) | 20 GB ruang kosong (SSD NVMe) |
+| **Akselerator Grafis** | CPU (Naive Bayes & SVM) | **NVIDIA GPU dengan VRAM $\ge$ 8 GB (CUDA 11.8 / 12.x)** *(misal: NVIDIA RTX 3060, T4, atau L4 GPU di Google Colab)* |
+
+---
+
+## 🚀 Panduan Instalasi & Menjalankan Aplikasi
+
+### 1. Kloning Repositori
 ```bash
+git clone https://github.com/ummulfarihah/nlp_experimen_lab.git
 cd nlp_experimen_lab
 ```
 
-### 2. Buat dan Aktifkan Virtual Environment
-**Windows:**
+### 2. Konfigurasi Lingkungan Virtual (*Virtual Environment*)
+
+**Pada Sistem Operasi Windows (PowerShell):**
 ```powershell
 python -m venv venv
 .\venv\Scripts\activate
 ```
 
-**Linux/macOS:**
+**Pada Sistem Operasi Linux / macOS:**
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Instal Dependensi
+### 3. Instalasi Pustaka & Dependensi
 ```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Jalankan Verifikasi Mandiri (*Self-Verification*)
-Tersedia skrip verifikasi otomatis untuk memastikan database, pipeline preprocessing, perhitungan McNemar, dan modul latih model Anda semuanya bekerja 100% normal:
+> **Catatan Instalasi PyTorch dengan Akselerasi CUDA:**
+> Jika Anda menggunakan GPU NVIDIA lokal, pastikan menginstal PyTorch dengan dukungan CUDA yang sesuai melalui:
+> ```bash
+> pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+> ```
+
+### 4. Konfigurasi Environment Variable (`.env`)
+Salin berkas konfigurasi template `.env.example` menjadi `.env`:
+```bash
+cp .env.example .env
+```
+Sesuaikan parameter penting pada `.env`:
+```env
+FLASK_ENV=development
+SECRET_KEY=masukkan-kunci-enkripsi-rahasia-anda
+ALLOWED_GOOGLE_EMAILS=ummulfarihah20@gmail.com,khamalade@gmail.com
+```
+
+### 5. Verifikasi Otomatis Integritas Sistem
+Jalankan modul verifikasi mandiri (*Self-Verification Script*) untuk memastikan seluruh *engine* ML, database, dan pipeline NLP berfungsi:
 ```bash
 python verify.py
 ```
-*Pastikan Anda melihat pesan:* `ALL TESTS COMPLETED SUCCESSFULLY! CORE ENGINE GREEN.`
+*Hasil yang diharapkan: `ALL TESTS COMPLETED SUCCESSFULLY! CORE ENGINE GREEN.`*
 
-### 5. Jalankan Aplikasi Flask Web Server
+### 6. Menjalankan Server Lokal Flask
 ```bash
 python app.py
 ```
-Aplikasi akan aktif dan dapat diakses melalui browser di alamat:
-[http://127.0.0.1:5000](http://127.0.0.1:5000)
-
-### 6. Jalankan di Google Colab (Remote GPU)
-Jika Anda tidak memiliki GPU NVIDIA lokal, Anda dapat menjalankan server Flask ini secara remote di Google Colab dengan mengunggah dan mengeksekusi berkas **`run_server_colab.ipynb`** menggunakan tunnel Ngrok.
+Buka peramban (*web browser*) dan akses portal pada:
+**`http://127.0.0.1:5000`**
 
 ---
 
-## 📁 Struktur Proyek (Directory Tree)
+## ☁️ Menjalankan di Google Colab (Remote GPU Acceleration)
+
+Bagi peneliti yang tidak memiliki GPU NVIDIA lokal, sistem telah dilengkapi dengan berkas notebook siap pakai **`run_server_colab.ipynb`**:
+
+1. Buka [Google Colab](https://colab.research.google.com/) dan ubah Runtime ke **GPU T4 / L4** (*Runtime $\rightarrow$ Change runtime type $\rightarrow$ T4/L4 GPU*).
+2. Unggah dan jalankan **`run_server_colab.ipynb`** secara berurutan:
+   * **Langkah 1**: Verifikasi GPU NVIDIA CUDA dan instalasi dependensi.
+   * **Langkah 2**: Kloning repositori GitHub NLP Lab.
+   * **Langkah 3**: Masukkan Ngrok Authtoken dan konfigurasi Domain Statis Ngrok.
+   * **Langkah 4**: Jalankan server Flask (`python app.py`).
+3. Akses URL publik statis yang dihasilkan untuk mengakses platform dengan kekuatan akselerasi GPU penuh.
+
+---
+
+## 📁 Struktur Direktori Repositori
 
 ```text
 nlp_experimen_lab/
 ├── static/
 │   ├── css/
-│   │   └── style.css           # Berkas gaya tampilan antarmuka (Vanilla CSS)
+│   │   └── style.css              # Sistem desain Glassmorphism & Token Tipografi
 │   ├── js/
-│   │   ├── app.js              # Logika frontend utama dan AJAX
-│   │   └── charts.js                   # Logika visualisasi grafik evaluasi (Chart.js)
-│   └── uploads/                # Direktori penyimpanan dinamis
-│       ├── datasets/           # Berkas CSV dataset yang diunggah
-│       ├── models/             # Berkas biner model terlatih (.pkl)
-│       ├── logs/               # Catatan log fisik per pekerjaan (.log)
-│       └── avatars/            # Foto profil pengguna
-├── templates/                  # Halaman HTML Frontend Flask
-│   └── index.html              # Single Page Application utama
-├── app.py                      # API Server & Backend Entrypoint
-├── config.py                   # Konfigurasi sistem & jalur direktori
-├── database.py                 # Manajemen inisialisasi & koneksi database SQLite
-├── ml_engine.py                # Pipeline Preprocessing, Naive Bayes & SVM
-├── bert_engine.py              # Fine-Tuning IndoBERT
-├── task_manager.py             # Pengelola antrean pelatihan asinkron
-├── verify.py                   # Alat pengujian otomatisasi mandiri
-├── nlp_experiments.ipynb       # Notebook Eksperimen Utama
-├── hyperparameter_tuning.ipynb # Notebook Penalaan Parameter
-├── run_server_colab.ipynb      # Notebook Runner Server di Google Colab
-├── requirements.txt            # Daftar pustaka & dependensi Python
-└── README.md                   # Dokumentasi panduan penggunaan
+│   │   ├── app.js                 # Router SPA, Event Handlers, & State Manager
+│   │   ├── charts.js              # Modul visualisasi data ApexCharts
+│   │   └── sw.js                  # Service Worker untuk PWA & Caching
+│   ├── img/                       # Brand logo & aset ikon resolusi tinggi
+│   └── uploads/                   # Direktori penyimpanan dinamis
+│       ├── datasets/              # Berkas korpus CSV yang diunggah
+│       ├── models/                # Berkas biner model terkompilasi (.pkl / .pt)
+│       ├── logs/                  # Berkas log fisik per proses eksperimen
+│       └── avatars/               # Foto profil pengguna terdaftar
+├── templates/
+│   └── index.html                 # Single Page Application (SPA) utama
+├── tests/
+│   ├── test_api.py                # 13 Integration Tests untuk REST API & Auth
+│   ├── test_ml_engine.py          # 4 Tests untuk Naive Bayes, SVM, & McNemar
+│   └── test_preprocessing.py      # 7 Tests untuk Text Cleaning & Tokenizer
+├── app.py                         # REST API Gateway & Server Entrypoint
+├── config.py                      # Konfigurasi aplikasi, path, & email whitelist
+├── database.py                    # Database Layer SQLite dengan WAL Mode & Migration
+├── ml_engine.py                   # Engine NLP Klasikal (MNB, SVM, TF-IDF, McNemar)
+├── bert_engine.py                 # Engine Deep Learning Transformer IndoBERT
+├── task_manager.py                # Asynchronous Worker & Job Lifecycle Manager
+├── verify.py                      # Skrip verifikasi mandiri unit engine
+├── nlp_experiments.ipynb          # Notebook Analisis Eksperimen Komprehensif
+├── hyperparameter_tuning.ipynb    # Notebook Penalaan Hiperparameter Mandiri
+├── run_server_colab.ipynb         # Google Colab GPU Server Runner
+├── requirements.txt               # Daftar dependensi & paket Python
+└── README.md                      # Dokumentasi akademik repositori
 ```
 
 ---
 
-## 📋 Lisensi & Reproduksibilitas
+## 🧪 Pengujian Perangkat Lunak (*Test Suite*)
 
-Setiap eksperimen yang dilakukan pada platform ini secara otomatis merekam metadata reproduksibilitas penuh di database, termasuk:
-- SHA256 Hash Dataset asli
-- Random Seed (Sistem & Model)
-- Model Hyperparameters lengkap
-- Versi Python, Sistem Operasi, Versi CUDA, model GPU, versi PyTorch, dan versi Transformers.
+Platform ini menerapkan standar pengujian otomatis (*Automated Unit & Integration Testing*) menggunakan pustaka `pytest` dengan cakupan 24 skenario pengujian:
 
-Selamat melakukan penelitian NLP! 🚀
+```bash
+pytest tests/ -v
+```
+
+### Rangkuman Hasil Pengujian:
+```text
+tests/test_api.py::test_health_check_endpoint PASSED                     [  4%]
+tests/test_api.py::test_login_endpoint_success PASSED                    [  8%]
+tests/test_api.py::test_login_endpoint_invalid_password PASSED           [ 12%]
+tests/test_api.py::test_unauthenticated_access_blocked PASSED            [ 16%]
+tests/test_api.py::test_authenticated_access_allowed PASSED              [ 20%]
+tests/test_api.py::test_preprocess_api_empty_text PASSED                 [ 25%]
+tests/test_api.py::test_system_resources_endpoint_authenticated PASSED   [ 29%]
+tests/test_api.py::test_db_read_connection_closure PASSED                [ 33%]
+tests/test_api.py::test_repeated_read_requests_no_leak PASSED            [ 37%]
+tests/test_api.py::test_database_driven_cancellation PASSED              [ 41%]
+tests/test_api.py::test_stale_job_recovery_on_init PASSED                [ 45%]
+tests/test_api.py::test_google_auth_non_whitelisted_denied PASSED        [ 50%]
+tests/test_api.py::test_google_auth_whitelisted_allowed PASSED           [ 54%]
+tests/test_ml_engine.py::test_calculate_metrics PASSED                   [ 58%]
+tests/test_ml_engine.py::test_train_classical_model_naive_bayes PASSED   [ 62%]
+tests/test_ml_engine.py::test_train_classical_model_svm PASSED           [ 66%]
+tests/test_ml_engine.py::test_run_mcnemar_test PASSED                    [ 70%]
+tests/test_preprocessing.py::test_preprocess_text_case_folding PASSED    [ 75%]
+tests/test_preprocessing.py::test_preprocess_text_noise_removal PASSED   [ 79%]
+tests/test_preprocessing.py::test_preprocess_text_slang_normalization PASSED [ 83%]
+tests/test_preprocessing.py::test_preprocess_text_step_by_step PASSED    [ 87%]
+tests/test_preprocessing.py::test_analyze_dataset_file_valid PASSED      [ 91%]
+tests/test_preprocessing.py::test_analyze_dataset_file_missing_columns PASSED [ 95%]
+tests/test_preprocessing.py::test_compute_dataset_hash PASSED            [100%]
+
+======================= 24 passed in 35.80s (100% SUCCESS) =======================
+```
+
+---
+
+## 📚 Sitasi Akademik & Referensi
+
+Jika Anda menggunakan platform ini, kode sumber, atau metodologi eksperimen ini dalam penelitian akademik, tesis, atau publikasi ilmiah, silakan mengutip karya ini:
+
+```bibtex
+@misc{farihah2026nlplab,
+  author       = {Ummul Farihah},
+  title        = {Ummu NLP Experiment Lab: Platform Komparasi Eksperimental Klasifikasi Teks Bahasa Indonesia (Naive Bayes, SVM, dan IndoBERT)},
+  year         = {2026},
+  publisher    = {GitHub},
+  journal      = {GitHub Repository},
+  howpublished = {\url{https://github.com/ummulfarihah/nlp_experimen_lab}},
+  institution  = {Fakultas Ilmu Komputer dan Teknologi Informasi, Universitas Muhammadiyah Sumatera Utara}
+}
+```
+
+---
+
+## 📄 Lisensi & Hak Cipta
+
+Proyek ini dikembangkan untuk tujuan penelitian akademik pada **Program Studi Informatika, Fakultas Ilmu Komputer dan Teknologi Informasi (FIKTI), Universitas Muhammadiyah Sumatera Utara (UMSU)**.
+
+Hak Cipta &copy; 2026 **Ummul Farihah**. Seluruh hak cipta dilindungi undang-undang.
