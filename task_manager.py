@@ -148,22 +148,56 @@ def start_training_job_async(
     return thread.ident
 
 
+def is_job_cancelled(job_id: int, cancel_event: Optional[threading.Event] = None) -> bool:
+    """
+    Checks if a job has received a cancellation signal, either via local thread
+    event or cross-worker database flag.
+    """
+    if cancel_event and cancel_event.is_set():
+        return True
+    try:
+        with db_session() as cursor:
+            cursor.execute('SELECT cancel_requested FROM experiment_jobs WHERE id = ?', (job_id,))
+            row = cursor.fetchone()
+            if row and (row['cancel_requested'] == 1 or row[0] == 1):
+                return True
+    except Exception as e:
+        logger.warning(f"Could not query cancellation state from DB for job {job_id}: {e}")
+    return False
+
+
 def cancel_training_job(job_id: int) -> bool:
     """
-    Triggers cancellation event for a running background job.
+    Triggers cancellation for a running background job via SQLite database flag.
+    Completely cross-worker safe across any number of Gunicorn worker processes.
 
     Args:
         job_id (int): The experiment job ID to cancel.
 
     Returns:
-        bool: True if cancellation signal was dispatched, False otherwise.
+        bool: True if cancellation flag was committed to DB, False otherwise.
     """
+    cancelled_ok = False
+    try:
+        with db_session() as cursor:
+            cursor.execute('''
+                UPDATE experiment_jobs
+                SET cancel_requested = 1
+                WHERE id = ? AND status NOT IN ('Completed', 'Failed', 'Cancelled')
+            ''', (job_id,))
+            if cursor.rowcount > 0:
+                cancelled_ok = True
+                logger.info(f"Database cancellation flag set for Job #{job_id}")
+    except Exception as e:
+        logger.error(f"Failed to set cancellation flag in DB for Job #{job_id}: {e}")
+
+    # Also notify local thread event if worker is on this process
     with _registry_lock:
         if job_id in ACTIVE_JOBS:
             ACTIVE_JOBS[job_id].set()
-            logger.info(f"Dispatched cancellation signal to Job #{job_id}")
-            return True
-    return False
+            cancelled_ok = True
+
+    return cancelled_ok
 
 
 def _training_job_worker(
@@ -181,7 +215,7 @@ def _training_job_worker(
     start_time = time.time()
 
     def check_cancellation(progress_pct: int, step_name: str) -> None:
-        if cancel_event.is_set():
+        if is_job_cancelled(job_id, cancel_event):
             db_log_event(job_id, "WARNING", "CANCELLATION", f"Job cancellation requested during '{step_name}'. Aborting...")
             _handle_job_failure(job_id, "Pelatihan dibatalkan oleh pengguna.", "Cancelled", start_time)
             raise InterruptedError("Job cancelled by user.")

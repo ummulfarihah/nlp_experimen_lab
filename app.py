@@ -11,6 +11,7 @@ import json
 import psutil
 import logging
 from datetime import datetime
+from functools import wraps
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -18,7 +19,8 @@ from werkzeug.utils import secure_filename
 from config import (
     resolve_db_path, setup_logging,
     BASE_DIR, UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATARS_FOLDER,
-    SQLALCHEMY_DATABASE_URI, GOOGLE_CLIENT_ID, SECRET_KEY, PORT, MAX_CONTENT_LENGTH
+    SQLALCHEMY_DATABASE_URI, GOOGLE_CLIENT_ID, SECRET_KEY, PORT, MAX_CONTENT_LENGTH,
+    DEBUG, ALLOWED_ORIGINS, FLASK_ENV
 )
 from database import get_db_connection, db_session, init_db, hash_password, verify_password
 from ml_engine import (
@@ -35,13 +37,35 @@ import pickle
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# Conditional development settings (disabled in production)
+if DEBUG:
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
-CORS(app)
+
+# Whitelist CORS origins
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
 # Initialize production logging
 logger = setup_logging(app)
+
+# Authentication decorator
+def login_required(f):
+    """
+    Decorator enforcing session authentication.
+    Returns 401 JSON if user session is not active.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session or not session.get('user'):
+            return jsonify({
+                "success": False,
+                "error": "Sesi autentikasi telah berakhir atau Anda belum login. Silakan masuk kembali."
+            }), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Create folders if not exists
 for folder in [UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATARS_FOLDER]:
@@ -305,11 +329,9 @@ def current_user():
     return error_response("Unauthorized", 401)
 
 @app.route('/api/v1/auth/profile', methods=['POST'])
+@login_required
 def update_profile():
     user = session.get('user')
-    if not user:
-        return error_response("Unauthorized", 401)
-        
     data = request.json or {}
     name = data.get('name')
     email = data.get('email')
@@ -319,21 +341,19 @@ def update_profile():
     if not name or not email or not institution or not role:
         return error_response("Semua kolom profil harus diisi.")
         
-    conn = get_db_connection()
-    existing = conn.execute('SELECT * FROM users WHERE email = ? AND id != ?', (email, user['id'])).fetchone()
-    if existing:
-        conn.close()
-        return error_response("Email sudah digunakan oleh akun lain.")
+    with get_db_connection() as conn:
+        existing = conn.execute('SELECT * FROM users WHERE email = ? AND id != ?', (email, user['id'])).fetchone()
+        if existing:
+            return error_response("Email sudah digunakan oleh akun lain.")
+            
+        conn.execute('''
+            UPDATE users
+            SET name = ?, email = ?, institution = ?, role = ?
+            WHERE id = ?
+        ''', (name, email, institution, role, user['id']))
+        conn.commit()
         
-    conn.execute('''
-        UPDATE users
-        SET name = ?, email = ?, institution = ?, role = ?
-        WHERE id = ?
-    ''', (name, email, institution, role, user['id']))
-    conn.commit()
-    
-    db_user = conn.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone()
-    conn.close()
+        db_user = conn.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone()
     
     user_info = {
         "id": str(db_user['id']),
@@ -347,11 +367,9 @@ def update_profile():
     return success_response(user_info, "Profil berhasil diperbarui.")
 
 @app.route('/api/v1/auth/change_password', methods=['POST'])
+@login_required
 def change_password():
     user = session.get('user')
-    if not user:
-        return error_response("Unauthorized", 401)
-        
     data = request.json or {}
     current_password = data.get('current_password', '')
     new_password = data.get('new_password', '')
@@ -362,31 +380,26 @@ def change_password():
     if len(new_password) < 6:
         return error_response("Kata sandi baru minimal 6 karakter.")
         
-    conn = get_db_connection()
-    db_user = conn.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone()
-    
-    if not db_user:
-        conn.close()
-        return error_response("Pengguna tidak ditemukan.", 404)
+    with get_db_connection() as conn:
+        db_user = conn.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone()
         
-    if not verify_password(current_password, db_user['password']):
-        conn.close()
-        return error_response("Kata sandi lama yang Anda masukkan salah.", 400)
-        
-    conn.execute('UPDATE users SET password = ? WHERE id = ?', (hash_password(new_password), user['id']))
-    conn.commit()
-    conn.close()
+        if not db_user:
+            return error_response("Pengguna tidak ditemukan.", 404)
+            
+        if not verify_password(current_password, db_user['password']):
+            return error_response("Kata sandi lama yang Anda masukkan salah.", 400)
+            
+        conn.execute('UPDATE users SET password = ? WHERE id = ?', (hash_password(new_password), user['id']))
+        conn.commit()
     
     logger.info(f"Password updated for user {user['id']}")
     return success_response(message="Kata sandi berhasil diubah.")
 
 @app.route('/api/v1/auth/avatar', methods=['POST'])
+@login_required
 def upload_avatar():
     """Handles uploading a new profile picture avatar."""
     user = session.get('user')
-    if not user:
-        return error_response("Unauthorized", 401)
-        
     if 'avatar' not in request.files:
         return error_response("Tidak ada berkas foto profil yang dikirim.")
         
@@ -409,14 +422,12 @@ def upload_avatar():
     
     # Update SQLite database
     avatar_url = f"/static/uploads/avatars/{unique_filename}"
-    conn = get_db_connection()
     try:
-        conn.execute('UPDATE users SET picture = ? WHERE id = ?', (avatar_url, user['id']))
-        conn.commit()
+        with get_db_connection() as conn:
+            conn.execute('UPDATE users SET picture = ? WHERE id = ?', (avatar_url, user['id']))
+            conn.commit()
     except Exception as e:
-        conn.close()
         return error_response(f"Gagal memperbarui database: {str(e)}")
-    conn.close()
     
     # Update current session
     session['user']['picture'] = avatar_url
@@ -427,11 +438,11 @@ def upload_avatar():
 
 # --- DATASET MANAGEMENT API ---
 @app.route('/api/v1/datasets', methods=['GET'])
+@login_required
 def get_datasets():
     """Lists all uploaded datasets."""
-    conn = get_db_connection()
-    datasets = conn.execute('SELECT * FROM datasets ORDER BY uploaded_at DESC').fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        datasets = conn.execute('SELECT * FROM datasets ORDER BY uploaded_at DESC').fetchall()
     
     result = []
     for d in datasets:
@@ -442,6 +453,7 @@ def get_datasets():
     return success_response(result)
 
 @app.route('/api/v1/datasets', methods=['POST'])
+@login_required
 def upload_dataset():
     """Handles CSV dataset file uploads, checks format, hashes, and records stats."""
     if 'file' not in request.files:
@@ -471,32 +483,30 @@ def upload_dataset():
         file_hash = compute_dataset_hash(save_path)
         
         # Check if hash already exists to prevent duplicate uploads
-        conn = get_db_connection()
-        existing = conn.execute('SELECT * FROM datasets WHERE file_hash = ?', (file_hash,)).fetchone()
-        
-        if existing:
-            conn.close()
-            os.remove(save_path) # remove redundant file
-            row = dict(existing)
-            row['class_distribution'] = json.loads(row['class_distribution'])
-            return success_response(row, "Dataset already exists. Loaded existing index.")
+        with get_db_connection() as conn:
+            existing = conn.execute('SELECT * FROM datasets WHERE file_hash = ?', (file_hash,)).fetchone()
             
-        # Write to database
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO datasets (name, filepath, file_hash, total_samples, class_distribution, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            file.filename,
-            save_path,
-            file_hash,
-            total_samples,
-            json.dumps(class_dist),
-            datetime.now().isoformat()
-        ))
-        dataset_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
+            if existing:
+                os.remove(save_path) # remove redundant file
+                row = dict(existing)
+                row['class_distribution'] = json.loads(row['class_distribution'])
+                return success_response(row, "Dataset already exists. Loaded existing index.")
+                
+            # Write to database
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO datasets (name, filepath, file_hash, total_samples, class_distribution, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                file.filename,
+                save_path,
+                file_hash,
+                total_samples,
+                json.dumps(class_dist),
+                datetime.now().isoformat()
+            ))
+            dataset_id = cursor.lastrowid
+            conn.commit()
         
         data_record = {
             "id": dataset_id,
@@ -516,73 +526,69 @@ def upload_dataset():
         return error_response(f"Invalid dataset structure: {str(e)}")
 
 @app.route('/api/v1/datasets/<int:id>', methods=['DELETE'])
+@login_required
 def delete_dataset_endpoint(id):
     """Deletes a dataset, its CSV file, and all associated model/log files, then deletes database entries."""
-    conn = get_db_connection()
     try:
-        # 1. Check if dataset exists
-        dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (id,)).fetchone()
-        if not dataset:
-            conn.close()
-            return error_response("Dataset tidak ditemukan.", 404)
-            
-        # 2. Check if any active training job is using this dataset
-        active_job = conn.execute('''
-            SELECT ej.id FROM experiment_jobs ej
-            JOIN experiments e ON ej.experiment_id = e.id
-            WHERE e.dataset_id = ? AND ej.status IN ('Preparing', 'Downloading Model', 'Training', 'Evaluating')
-        ''', (id,)).fetchone()
-        if active_job:
-            conn.close()
-            return error_response(f"Dataset sedang digunakan oleh proses training aktif (Job ID: {active_job['id']}). Silakan batalkan training terlebih dahulu.", 400)
-            
-        # 3. Find all jobs associated with this dataset to delete physical model files and log files
-        associated_jobs = conn.execute('''
-            SELECT ej.id, ej.model_artifact_path FROM experiment_jobs ej
-            JOIN experiments e ON ej.experiment_id = e.id
-            WHERE e.dataset_id = ?
-        ''', (id,)).fetchall()
-        
-        # Delete physical model files & log files
-        for job in associated_jobs:
-            if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
-                try:
-                    os.remove(job['model_artifact_path'])
-                except Exception as e:
-                    print(f"Error removing model artifact for job {job['id']}: {e}")
-                    
-            log_path = create_job_log_file_path(job['id'])
-            if os.path.exists(log_path):
-                try:
-                    os.remove(log_path)
-                except Exception as e:
-                    print(f"Error removing log file for job {job['id']}: {e}")
-                    
-        # 4. Delete physical CSV dataset file
-        if dataset['filepath'] and os.path.exists(dataset['filepath']):
-            try:
-                os.remove(resolve_db_path(dataset['filepath']))
-            except Exception as e:
-                print(f"Error removing dataset file {dataset['filepath']}: {e}")
+        with get_db_connection() as conn:
+            # 1. Check if dataset exists
+            dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (id,)).fetchone()
+            if not dataset:
+                return error_response("Dataset tidak ditemukan.", 404)
                 
-        # 5. Delete dataset from DB (cascades experiments, jobs, logs, evaluations)
-        conn.execute('DELETE FROM datasets WHERE id = ?', (id,))
-        conn.commit()
-        conn.close()
-        
+            # 2. Check if any active training job is using this dataset
+            active_job = conn.execute('''
+                SELECT ej.id FROM experiment_jobs ej
+                JOIN experiments e ON ej.experiment_id = e.id
+                WHERE e.dataset_id = ? AND ej.status IN ('Preparing', 'Downloading Model', 'Training', 'Evaluating')
+            ''', (id,)).fetchone()
+            if active_job:
+                return error_response(f"Dataset sedang digunakan oleh proses training aktif (Job ID: {active_job['id']}). Silakan batalkan training terlebih dahulu.", 400)
+                
+            # 3. Find all jobs associated with this dataset to delete physical model files and log files
+            associated_jobs = conn.execute('''
+                SELECT ej.id, ej.model_artifact_path FROM experiment_jobs ej
+                JOIN experiments e ON ej.experiment_id = e.id
+                WHERE e.dataset_id = ?
+            ''', (id,)).fetchall()
+            
+            # Delete physical model files & log files
+            for job in associated_jobs:
+                if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
+                    try:
+                        os.remove(job['model_artifact_path'])
+                    except Exception as e:
+                        logger.warning(f"Error removing model artifact for job {job['id']}: {e}")
+                        
+                log_path = create_job_log_file_path(job['id'])
+                if os.path.exists(log_path):
+                    try:
+                        os.remove(log_path)
+                    except Exception as e:
+                        logger.warning(f"Error removing log file for job {job['id']}: {e}")
+                        
+            # 4. Delete physical CSV dataset file
+            if dataset['filepath'] and os.path.exists(dataset['filepath']):
+                try:
+                    os.remove(resolve_db_path(dataset['filepath']))
+                except Exception as e:
+                    logger.warning(f"Error removing dataset file {dataset['filepath']}: {e}")
+                    
+            # 5. Delete dataset from DB (cascades experiments, jobs, logs, evaluations)
+            conn.execute('DELETE FROM datasets WHERE id = ?', (id,))
+            conn.commit()
+            
         return success_response(message="Dataset dan semua riwayat model terkait berhasil dihapus.")
         
     except Exception as e:
-        if conn:
-            conn.close()
         return error_response(f"Gagal menghapus dataset: {str(e)}")
 
 @app.route('/api/v1/datasets/<int:id>/preview', methods=['GET'])
+@login_required
 def dataset_preview(id):
     """Fetches first 10 rows of a dataset CSV."""
-    conn = get_db_connection()
-    dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (id,)).fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (id,)).fetchone()
     
     if not dataset:
         return error_response("Dataset not found.", 404)
@@ -597,6 +603,7 @@ def dataset_preview(id):
 
 # --- PREPROCESSING LAB API ---
 @app.route('/api/v1/preprocess', methods=['POST'])
+@login_required
 def interactive_preprocess():
     """Allows step-by-step preview of Indonesian preprocessing operations (Classic Pipeline)."""
     data = request.json or {}
@@ -613,6 +620,7 @@ def interactive_preprocess():
 
 
 @app.route('/api/v1/preprocess/bert', methods=['POST'])
+@login_required
 def interactive_preprocess_bert():
     """Allows step-by-step preview of IndoBERT subword tokenization and tensor encoding."""
     data = request.json or {}
@@ -630,6 +638,7 @@ def interactive_preprocess_bert():
 
 # --- EXPERIMENTS & TRAINING API ---
 @app.route('/api/v1/experiments', methods=['POST'])
+@login_required
 def run_experiment():
     """Defines and schedules a model training task on a background worker thread."""
     data = request.json or {}
@@ -643,12 +652,6 @@ def run_experiment():
     if not name or not dataset_id or not model_type:
         return error_response("Name, dataset_id, and model_type are required.")
         
-    conn = get_db_connection()
-    dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (dataset_id,)).fetchone()
-    if not dataset:
-        conn.close()
-        return error_response("Dataset not found.", 404)
-        
     # Validate split_config
     if not split_config:
         split_config = {
@@ -660,75 +663,74 @@ def run_experiment():
         if method == "external":
             test_dataset_id = split_config.get("test_dataset_id")
             if not test_dataset_id:
-                conn.close()
                 return error_response("test_dataset_id is required for external split method.")
-            test_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (test_dataset_id,)).fetchone()
-            if not test_dataset:
-                conn.close()
-                return error_response(f"External test dataset with ID {test_dataset_id} not found.", 404)
-                
-            val_dataset_id = split_config.get("val_dataset_id")
-            if val_dataset_id:
-                val_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (val_dataset_id,)).fetchone()
-                if not val_dataset:
-                    conn.close()
-                    return error_response(f"External validation dataset with ID {val_dataset_id} not found.", 404)
+            with get_db_connection() as conn:
+                test_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (test_dataset_id,)).fetchone()
+                if not test_dataset:
+                    return error_response(f"External test dataset with ID {test_dataset_id} not found.", 404)
+                    
+                val_dataset_id = split_config.get("val_dataset_id")
+                if val_dataset_id:
+                    val_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (val_dataset_id,)).fetchone()
+                    if not val_dataset:
+                        return error_response(f"External validation dataset with ID {val_dataset_id} not found.", 404)
         else:
             try:
                 test_size = float(split_config.get("test_size", 0.2))
                 if not (0.0 < test_size < 1.0):
-                    conn.close()
                     return error_response("test_size must be a float between 0.0 and 1.0 (exclusive).")
             except (ValueError, TypeError):
-                conn.close()
                 return error_response("test_size must be a valid float.")
         
     try:
-        cursor = conn.cursor()
+        with get_db_connection() as conn:
+            dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (dataset_id,)).fetchone()
+            if not dataset:
+                return error_response("Dataset not found.", 404)
+
+            cursor = conn.cursor()
+            # 1. Insert Model Config
+            cursor.execute('''
+                INSERT INTO model_configs (name, model_type, parameters, created_at)
+                VALUES (?, ?, ?, ?)
+            ''', (f"Config_{name}", model_type, json.dumps(parameters), datetime.now().isoformat()))
+            config_id = cursor.lastrowid
+            
+            # 2. Insert Experiment
+            env_meta = {
+                "python_version": sys.version.split()[0],
+                "os": sys.platform,
+                "processor": psutil.cpu_allocator if hasattr(psutil, 'cpu_allocator') else 'X86_64'
+            }
+            cursor.execute('''
+                INSERT INTO experiments (name, dataset_id, model_config_id, random_seed, environment_meta, split_config, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (name, dataset_id, config_id, random_seed, json.dumps(env_meta), json.dumps(split_config), datetime.now().isoformat()))
+            experiment_id = cursor.lastrowid
+            
+            # 3. Insert Experiment Job (Status: Preparing)
+            cursor.execute('''
+                INSERT INTO experiment_jobs (experiment_id, status, started_at, progress)
+                VALUES (?, 'Preparing', ?, 0)
+            ''', (experiment_id, datetime.now().isoformat()))
+            job_id = cursor.lastrowid
+            
+            # Commit to let task worker see the DB entries
+            conn.commit()
+            dataset_filepath = str(dataset['filepath'])
         
-        # 1. Insert Model Config
-        cursor.execute('''
-            INSERT INTO model_configs (name, model_type, parameters, created_at)
-            VALUES (?, ?, ?, ?)
-        ''', (f"Config_{name}", model_type, json.dumps(parameters), datetime.now().isoformat()))
-        config_id = cursor.lastrowid
-        
-        # 2. Insert Experiment
-        env_meta = {
-            "python_version": sys.version.split()[0],
-            "os": sys.platform,
-            "processor": psutil.cpu_allocator if hasattr(psutil, 'cpu_allocator') else 'X86_64'
-        }
-        cursor.execute('''
-            INSERT INTO experiments (name, dataset_id, model_config_id, random_seed, environment_meta, split_config, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (name, dataset_id, config_id, random_seed, json.dumps(env_meta), json.dumps(split_config), datetime.now().isoformat()))
-        experiment_id = cursor.lastrowid
-        
-        # 3. Insert Experiment Job (Status: Preparing)
-        cursor.execute('''
-            INSERT INTO experiment_jobs (experiment_id, status, started_at, progress)
-            VALUES (?, 'Preparing', ?, 0)
-        ''', (experiment_id, datetime.now().isoformat()))
-        job_id = cursor.lastrowid
-        
-        # Commit to let task worker see the DB entries
-        conn.commit()
-        conn.close()
-        
-        # 4. Trigger Asynchronous ThreadPool Task
+        # 4. Trigger Asynchronous Task
         thread_id = start_training_job_async(
             job_id=job_id,
-            dataset_path=resolve_db_path(dataset['filepath']),
+            dataset_path=resolve_db_path(dataset_filepath),
             model_type=model_type,
             params=parameters
         )
         
         # Update Job entry with thread ID acting as task_id
-        conn2 = get_db_connection()
-        conn2.execute('UPDATE experiment_jobs SET celery_task_id = ? WHERE id = ?', (str(thread_id), job_id))
-        conn2.commit()
-        conn2.close()
+        with get_db_connection() as conn2:
+            conn2.execute('UPDATE experiment_jobs SET celery_task_id = ? WHERE id = ?', (str(thread_id), job_id))
+            conn2.commit()
         
         return success_response({"job_id": job_id}, f"Experiment launched successfully. Running background Job ID: {job_id}")
         
@@ -736,19 +738,19 @@ def run_experiment():
         return error_response(f"Failed to launch experiment: {e}")
 
 @app.route('/api/v1/experiments/jobs', methods=['GET'])
+@login_required
 def list_jobs():
     """Lists all training job execution records with training configs."""
-    conn = get_db_connection()
-    query = '''
-        SELECT ej.*, e.name as exp_name, mc.model_type, mc.parameters, d.name as dataset_name
-        FROM experiment_jobs ej
-        JOIN experiments e ON ej.experiment_id = e.id
-        JOIN model_configs mc ON e.model_config_id = mc.id
-        JOIN datasets d ON e.dataset_id = d.id
-        ORDER BY ej.id DESC
-    '''
-    jobs = conn.execute(query).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        query = '''
+            SELECT ej.*, e.name as exp_name, mc.model_type, mc.parameters, d.name as dataset_name
+            FROM experiment_jobs ej
+            JOIN experiments e ON ej.experiment_id = e.id
+            JOIN model_configs mc ON e.model_config_id = mc.id
+            JOIN datasets d ON e.dataset_id = d.id
+            ORDER BY ej.id DESC
+        '''
+        jobs = conn.execute(query).fetchall()
     
     result = []
     for j in jobs:
@@ -759,106 +761,101 @@ def list_jobs():
     return success_response(result)
 
 @app.route('/api/v1/experiments/jobs/<int:id>', methods=['GET'])
+@login_required
 def get_job(id):
     """Fetches full state and evaluations of a specific training job."""
-    conn = get_db_connection()
-    job = conn.execute('''
-        SELECT ej.*, e.name as exp_name, mc.model_type, mc.parameters, d.name as dataset_name, d.file_hash as dataset_hash
-        FROM experiment_jobs ej
-        JOIN experiments e ON ej.experiment_id = e.id
-        JOIN model_configs mc ON e.model_config_id = mc.id
-        JOIN datasets d ON e.dataset_id = d.id
-        WHERE ej.id = ?
-    ''', (id,)).fetchone()
-    
-    if not job:
-        conn.close()
-        return error_response("Job not found.", 404)
+    with get_db_connection() as conn:
+        job = conn.execute('''
+            SELECT ej.*, e.name as exp_name, mc.model_type, mc.parameters, d.name as dataset_name, d.file_hash as dataset_hash
+            FROM experiment_jobs ej
+            JOIN experiments e ON ej.experiment_id = e.id
+            JOIN model_configs mc ON e.model_config_id = mc.id
+            JOIN datasets d ON e.dataset_id = d.id
+            WHERE ej.id = ?
+        ''', (id,)).fetchone()
         
-    job_dict = dict(job)
-    job_dict['parameters'] = json.loads(job_dict['parameters'])
-    
-    # Calculate elapsed training time on server
-    if job_dict['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
-        try:
-            started = datetime.fromisoformat(job_dict['started_at'])
-            job_dict['elapsed_seconds'] = max(0, int((datetime.now() - started).total_seconds()))
-        except Exception:
-            job_dict['elapsed_seconds'] = 0
-    else:
-        if job_dict.get('training_time'):
-            job_dict['elapsed_seconds'] = int(job_dict['training_time'])
-        elif job_dict.get('completed_at') and job_dict.get('started_at'):
+        if not job:
+            return error_response("Job not found.", 404)
+            
+        job_dict = dict(job)
+        job_dict['parameters'] = json.loads(job_dict['parameters'])
+        
+        # Calculate elapsed training time on server
+        if job_dict['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
             try:
                 started = datetime.fromisoformat(job_dict['started_at'])
-                completed = datetime.fromisoformat(job_dict['completed_at'])
-                job_dict['elapsed_seconds'] = max(0, int((completed - started).total_seconds()))
+                job_dict['elapsed_seconds'] = max(0, int((datetime.now() - started).total_seconds()))
             except Exception:
                 job_dict['elapsed_seconds'] = 0
         else:
-            job_dict['elapsed_seconds'] = 0
-            
-    # Check evaluation metrics
-    evaluation = conn.execute('SELECT * FROM evaluations WHERE experiment_job_id = ?', (id,)).fetchone()
-    if evaluation:
-        eval_dict = dict(evaluation)
-        eval_dict['per_class_metrics'] = json.loads(eval_dict['per_class_metrics'])
-        eval_dict['confusion_matrix'] = json.loads(eval_dict['confusion_matrix'])
-        eval_dict['classification_report'] = json.loads(eval_dict['classification_report'])
-        job_dict['evaluation'] = eval_dict
-    else:
-        job_dict['evaluation'] = None
+            if job_dict.get('training_time'):
+                job_dict['elapsed_seconds'] = int(job_dict['training_time'])
+            elif job_dict.get('completed_at') and job_dict.get('started_at'):
+                try:
+                    started = datetime.fromisoformat(job_dict['started_at'])
+                    completed = datetime.fromisoformat(job_dict['completed_at'])
+                    job_dict['elapsed_seconds'] = max(0, int((completed - started).total_seconds()))
+                except Exception:
+                    job_dict['elapsed_seconds'] = 0
+            else:
+                job_dict['elapsed_seconds'] = 0
+                
+        # Check evaluation metrics
+        evaluation = conn.execute('SELECT * FROM evaluations WHERE experiment_job_id = ?', (id,)).fetchone()
+        if evaluation:
+            eval_dict = dict(evaluation)
+            eval_dict['per_class_metrics'] = json.loads(eval_dict['per_class_metrics'])
+            eval_dict['confusion_matrix'] = json.loads(eval_dict['confusion_matrix'])
+            eval_dict['classification_report'] = json.loads(eval_dict['classification_report'])
+            job_dict['evaluation'] = eval_dict
+        else:
+            job_dict['evaluation'] = None
         
-    conn.close()
     return success_response(job_dict)
 
 @app.route('/api/v1/experiments/jobs/<int:id>', methods=['DELETE'])
+@login_required
 def delete_job_endpoint(id):
     """Deletes a training job record, its model artifact (.pkl), and its text log file from disk."""
-    conn = get_db_connection()
     try:
-        # 1. Check if job exists
-        job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (id,)).fetchone()
-        if not job:
-            conn.close()
-            return error_response("Pekerjaan training tidak ditemukan.", 404)
-            
-        # 2. Check if job is currently running
-        if job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
-            conn.close()
-            return error_response("Pekerjaan training sedang aktif berjalan. Batalkan training terlebih dahulu sebelum menghapus riwayat.", 400)
-            
-        # 3. Delete physical model artifact if it exists
-        if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
-            try:
-                os.remove(job['model_artifact_path'])
-            except Exception as e:
-                print(f"Error removing model artifact for job {id}: {e}")
+        with get_db_connection() as conn:
+            # 1. Check if job exists
+            job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (id,)).fetchone()
+            if not job:
+                return error_response("Pekerjaan training tidak ditemukan.", 404)
                 
-        # 4. Delete physical log file from disk
-        log_path = create_job_log_file_path(id)
-        if os.path.exists(log_path):
-            try:
-                os.remove(log_path)
-            except Exception as e:
-                print(f"Error removing log file for job {id}: {e}")
+            # 2. Check if job is currently running
+            if job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
+                return error_response("Pekerjaan training sedang aktif berjalan. Batalkan training terlebih dahulu sebelum menghapus riwayat.", 400)
                 
-        # 5. Delete job from DB (cascades evaluations, logs)
-        conn.execute('DELETE FROM experiment_jobs WHERE id = ?', (id,))
-        # Also clean up mcnemar results referencing this model
-        conn.execute('DELETE FROM mcnemar_results WHERE model_a_job_id = ? OR model_b_job_id = ?', (id, id))
-        
-        conn.commit()
-        conn.close()
-        
+            # 3. Delete physical model artifact if it exists
+            if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
+                try:
+                    os.remove(job['model_artifact_path'])
+                except Exception as e:
+                    logger.warning(f"Error removing model artifact for job {id}: {e}")
+                    
+            # 4. Delete physical log file from disk
+            log_path = create_job_log_file_path(id)
+            if os.path.exists(log_path):
+                try:
+                    os.remove(log_path)
+                except Exception as e:
+                    logger.warning(f"Error removing log file for job {id}: {e}")
+                    
+            # 5. Delete job from DB (cascades evaluations, logs)
+            conn.execute('DELETE FROM experiment_jobs WHERE id = ?', (id,))
+            # Also clean up mcnemar results referencing this model
+            conn.execute('DELETE FROM mcnemar_results WHERE model_a_job_id = ? OR model_b_job_id = ?', (id, id))
+            conn.commit()
+            
         return success_response(message="Riwayat training model berhasil dihapus.")
         
     except Exception as e:
-        if conn:
-            conn.close()
         return error_response(f"Gagal menghapus riwayat training: {str(e)}")
 
 @app.route('/api/v1/experiments/jobs/<int:id>/cancel', methods=['POST'])
+@login_required
 def cancel_job_endpoint(id):
     """Triggers background thread cancellation for a running job."""
     cancelled = cancel_training_job(id)
@@ -866,31 +863,28 @@ def cancel_job_endpoint(id):
         return success_response(message=f"Job {id} cancellation signal dispatched.")
         
     # If not actively running in-memory, check if it's a zombie active job in DB
-    conn = None
     try:
-        conn = get_db_connection()
-        job = conn.execute('SELECT status FROM experiment_jobs WHERE id = ?', (id,)).fetchone()
-        if job and job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
-            # Safe recovery: update database status to Cancelled
-            conn.execute('''
-                UPDATE experiment_jobs 
-                SET status = 'Cancelled', completed_at = ?, failure_reason = 'Stale job cancelled after server restart.' 
-                WHERE id = ?
-            ''', (datetime.now().isoformat(), id))
-            conn.commit()
-            
-            # Log the recovery event
-            db_log_event(id, "WARNING", "ZOMBIE_RECOVERY", "Zombie/stale training job safely recovered and marked as Cancelled.")
-            return success_response(message=f"Zombie Job {id} safely recovered and marked as Cancelled.")
+        with get_db_connection() as conn:
+            job = conn.execute('SELECT status FROM experiment_jobs WHERE id = ?', (id,)).fetchone()
+            if job and job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
+                # Safe recovery: update database status to Cancelled
+                conn.execute('''
+                    UPDATE experiment_jobs 
+                    SET status = 'Cancelled', completed_at = ?, failure_reason = 'Stale job cancelled after server restart.' 
+                    WHERE id = ?
+                ''', (datetime.now().isoformat(), id))
+                conn.commit()
+                
+                # Log the recovery event
+                db_log_event(id, "WARNING", "ZOMBIE_RECOVERY", "Zombie/stale training job safely recovered and marked as Cancelled.")
+                return success_response(message=f"Zombie Job {id} safely recovered and marked as Cancelled.")
     except Exception as e:
-        print(f"Error recovering zombie job {id}: {e}")
-    finally:
-        if conn:
-            conn.close()
+        logger.warning(f"Error recovering zombie job {id}: {e}")
             
     return error_response("Job is not actively running or cannot be cancelled.")
 
 @app.route('/api/v1/experiments/jobs/<int:id>/logs', methods=['GET'])
+@login_required
 def get_job_logs(id):
     """Reads the raw task logger text file line-by-line."""
     log_path = create_job_log_file_path(id)
@@ -930,19 +924,19 @@ def get_job_logs(id):
 
 # --- EVALUATIONS & STATISTICAL COMPARISONS API ---
 @app.route('/api/v1/evaluations', methods=['GET'])
+@login_required
 def list_evaluations():
     """Lists all computed model evaluations."""
-    conn = get_db_connection()
-    query = '''
-        SELECT ev.*, ej.model_artifact_path, mc.model_type, mc.name as config_name, e.name as exp_name
-        FROM evaluations ev
-        JOIN experiment_jobs ej ON ev.experiment_job_id = ej.id
-        JOIN experiments e ON ej.experiment_id = e.id
-        JOIN model_configs mc ON e.model_config_id = mc.id
-        WHERE ej.status = 'Completed'
-    '''
-    evals = conn.execute(query).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        query = '''
+            SELECT ev.*, ej.model_artifact_path, mc.model_type, mc.name as config_name, e.name as exp_name
+            FROM evaluations ev
+            JOIN experiment_jobs ej ON ev.experiment_job_id = ej.id
+            JOIN experiments e ON ej.experiment_id = e.id
+            JOIN model_configs mc ON e.model_config_id = mc.id
+            WHERE ej.status = 'Completed'
+        '''
+        evals = conn.execute(query).fetchall()
     
     result = []
     for ev in evals:
@@ -955,6 +949,7 @@ def list_evaluations():
     return success_response(result)
 
 @app.route('/api/v1/evaluations/mcnemar', methods=['POST'])
+@login_required
 def evaluate_mcnemar():
     """Computes McNemar Contingency table and Significance (p-value) comparing two classifiers."""
     data = request.json or {}
@@ -967,111 +962,105 @@ def evaluate_mcnemar():
     if model_a_id == model_b_id:
         return error_response("You must select two different models to compare.")
         
-    conn = get_db_connection()
-    
-    # 1. Fetch Evaluations to access test predictions and labels
-    job_a = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (model_a_id,)).fetchone()
-    job_b = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (model_b_id,)).fetchone()
-    
-    if not job_a or not job_b:
-        conn.close()
-        return error_response("Both models must be in Completed state.", 400)
-        
     try:
-        # Try to read pre-computed predictions from SQLite evaluations table first
-        eval_a = conn.execute('SELECT y_test, y_pred FROM evaluations WHERE experiment_job_id = ?', (model_a_id,)).fetchone()
-        eval_b = conn.execute('SELECT y_test, y_pred FROM evaluations WHERE experiment_job_id = ?', (model_b_id,)).fetchone()
-        
-        has_stored_preds = False
-        if eval_a and eval_b:
-            try:
-                if eval_a['y_test'] and eval_a['y_pred'] and eval_b['y_test'] and eval_b['y_pred']:
-                    y_test_a = json.loads(eval_a['y_test'])
-                    y_pred_a = json.loads(eval_a['y_pred'])
-                    y_test_b = json.loads(eval_b['y_test'])
-                    y_pred_b = json.loads(eval_b['y_pred'])
+        with get_db_connection() as conn:
+            # 1. Fetch Evaluations to access test predictions and labels
+            job_a = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (model_a_id,)).fetchone()
+            job_b = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (model_b_id,)).fetchone()
+            
+            if not job_a or not job_b:
+                return error_response("Both models must be in Completed state.", 400)
+                
+            # Try to read pre-computed predictions from SQLite evaluations table first
+            eval_a = conn.execute('SELECT y_test, y_pred FROM evaluations WHERE experiment_job_id = ?', (model_a_id,)).fetchone()
+            eval_b = conn.execute('SELECT y_test, y_pred FROM evaluations WHERE experiment_job_id = ?', (model_b_id,)).fetchone()
+            
+            has_stored_preds = False
+            if eval_a and eval_b:
+                try:
+                    if eval_a['y_test'] and eval_a['y_pred'] and eval_b['y_test'] and eval_b['y_pred']:
+                        y_test_a = json.loads(eval_a['y_test'])
+                        y_pred_a = json.loads(eval_a['y_pred'])
+                        y_test_b = json.loads(eval_b['y_test'])
+                        y_pred_b = json.loads(eval_b['y_pred'])
+                        
+                        # Guard: block if test sets differ in any way (size or contents)
+                        if y_test_a != y_test_b:
+                            return error_response("Uji McNemar hanya dapat dilakukan jika kedua model dievaluasi pada data uji (test set) yang sama persis.", 400)
+                        
+                        # Ensure they are non-empty and matching in size
+                        if len(y_test_a) > 0 and len(y_test_a) == len(y_pred_a) and len(y_test_b) == len(y_pred_b) and len(y_pred_a) == len(y_pred_b):
+                            y_test = y_test_a
+                            has_stored_preds = True
+                except Exception as e:
+                    logger.warning(f"Failed to parse stored predictions for McNemar, falling back: {e}")
                     
-                    # Guard: block if test sets differ in any way (size or contents)
-                    if y_test_a != y_test_b:
-                        conn.close()
-                        return error_response("Uji McNemar hanya dapat dilakukan jika kedua model dievaluasi pada data uji (test set) yang sama persis.", 400)
+            if has_stored_preds:
+                # Run McNemar Test with stored predictions
+                test_results = run_mcnemar_test(y_test, y_pred_a, y_pred_b)
+            else:
+                # Backward compatibility fallback: load pkl packages and run on-the-fly predictions
+                with open(job_a['model_artifact_path'], 'rb') as f:
+                    pkg_a = pickle.load(f)
+                with open(job_b['model_artifact_path'], 'rb') as f:
+                    pkg_b = pickle.load(f)
                     
-                    # Ensure they are non-empty and matching in size
-                    if len(y_test_a) > 0 and len(y_test_a) == len(y_pred_a) and len(y_test_b) == len(y_pred_b) and len(y_pred_a) == len(y_pred_b):
-                        y_test = y_test_a
-                        has_stored_preds = True
-            except Exception as e:
-                print(f"Failed to use stored predictions for McNemar, falling back: {e}")
-                pass
+                dataset_conn = conn.execute('''
+                    SELECT d.filepath FROM datasets d
+                    JOIN experiments e ON e.dataset_id = d.id
+                    JOIN experiment_jobs ej ON ej.experiment_id = e.id
+                    WHERE ej.id = ?
+                ''', (model_a_id,)).fetchone()
                 
-        if has_stored_preds:
-            # Run McNemar Test with stored predictions
-            test_results = run_mcnemar_test(y_test, y_pred_a, y_pred_b)
-        else:
-            # Backward compatibility fallback: load pkl packages and run on-the-fly predictions
-            with open(job_a['model_artifact_path'], 'rb') as f:
-                pkg_a = pickle.load(f)
-            with open(job_b['model_artifact_path'], 'rb') as f:
-                pkg_b = pickle.load(f)
+                df = pd.read_csv(dataset_conn['filepath'])
+                texts = df['text'].astype(str).tolist()
+                labels = df['label'].astype(str).tolist()
                 
-            # Let's load the dataset of the first model (they should share the same dataset or we check)
-            dataset_conn = conn.execute('''
-                SELECT d.filepath FROM datasets d
-                JOIN experiments e ON e.dataset_id = d.id
-                JOIN experiment_jobs ej ON ej.experiment_id = e.id
-                WHERE ej.id = ?
-            ''', (model_a_id,)).fetchone()
-            
-            df = pd.read_csv(dataset_conn['filepath'])
-            texts = df['text'].astype(str).tolist()
-            labels = df['label'].astype(str).tolist()
-            
-            # Get test split (20% partition with safe stratification fallback)
-            import numpy as np
-            from sklearn.model_selection import train_test_split
-            
-            can_stratify = False
-            if len(labels) >= 2:
-                class_counts = pd.Series(labels).value_counts()
-                test_size_count = int(np.ceil(0.2 * len(labels)))
-                if class_counts.min() >= 2 and test_size_count >= len(class_counts):
-                    can_stratify = True
-            stratify_param = labels if can_stratify else None
-            
-            _, X_test, _, y_test = train_test_split(
-                texts, labels, test_size=0.2, random_state=42, stratify=stratify_param
-            )
-            
-            # Predict on X_test with Model A
-            y_pred_a = []
-            for text in X_test:
-                res_a = predict_sample(pkg_a, text)
-                y_pred_a.append(res_a['label'])
+                # Get test split (20% partition with safe stratification fallback)
+                import numpy as np
+                from sklearn.model_selection import train_test_split
                 
-            # Predict on X_test with Model B
-            y_pred_b = []
-            for text in X_test:
-                res_b = predict_sample(pkg_b, text)
-                y_pred_b.append(res_b['label'])
+                can_stratify = False
+                if len(labels) >= 2:
+                    class_counts = pd.Series(labels).value_counts()
+                    test_size_count = int(np.ceil(0.2 * len(labels)))
+                    if class_counts.min() >= 2 and test_size_count >= len(class_counts):
+                        can_stratify = True
+                stratify_param = labels if can_stratify else None
                 
-            # Run McNemar Test
-            test_results = run_mcnemar_test(y_test, y_pred_a, y_pred_b)
-        
-        # Save results in SQLite
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO mcnemar_results (model_a_job_id, model_b_job_id, p_value, contingency_matrix, significant, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            model_a_id, 
-            model_b_id, 
-            test_results['p_value'], 
-            json.dumps(test_results['contingency_matrix']), 
-            test_results['significant'], 
-            datetime.now().isoformat()
-        ))
-        conn.commit()
-        conn.close()
+                _, X_test, _, y_test = train_test_split(
+                    texts, labels, test_size=0.2, random_state=42, stratify=stratify_param
+                )
+                
+                # Predict on X_test with Model A
+                y_pred_a = []
+                for text in X_test:
+                    res_a = predict_sample(pkg_a, text)
+                    y_pred_a.append(res_a['label'])
+                    
+                # Predict on X_test with Model B
+                y_pred_b = []
+                for text in X_test:
+                    res_b = predict_sample(pkg_b, text)
+                    y_pred_b.append(res_b['label'])
+                    
+                # Run McNemar Test
+                test_results = run_mcnemar_test(y_test, y_pred_a, y_pred_b)
+            
+            # Save results in SQLite
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO mcnemar_results (model_a_job_id, model_b_job_id, p_value, contingency_matrix, significant, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                model_a_id, 
+                model_b_id, 
+                test_results['p_value'], 
+                json.dumps(test_results['contingency_matrix']), 
+                test_results['significant'], 
+                datetime.now().isoformat()
+            ))
+            conn.commit()
         
         # Format response
         result_payload = {
@@ -1084,13 +1073,13 @@ def evaluate_mcnemar():
         return success_response(result_payload, "McNemar significance testing computed successfully.")
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Statistical evaluation failed: {e}")
         return error_response(f"Statistical evaluation failed: {e}")
 
 
 # --- PREDICTION LAB API ---
 @app.route('/api/v1/predict/single', methods=['POST'])
+@login_required
 def predict_single():
     data = request.json or {}
     job_id = data.get('job_id')
@@ -1099,9 +1088,8 @@ def predict_single():
     if not job_id or not text.strip():
         return error_response("Both job_id and text are required.")
         
-    conn = get_db_connection()
-    job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
     
     if not job:
         return error_response("Completed model artifact not found.", 404)
@@ -1117,6 +1105,7 @@ def predict_single():
         return error_response(f"Prediction failed: {e}")
 
 @app.route('/api/v1/predict/batch', methods=['POST'])
+@login_required
 def predict_batch():
     if 'file' not in request.files:
         return error_response("No file provided.")
@@ -1132,9 +1121,8 @@ def predict_batch():
     if file.filename == '':
         return error_response("Empty file selected.")
         
-    conn = get_db_connection()
-    job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
     
     if not job:
         return error_response("Completed model artifact not found.", 404)
@@ -1180,37 +1168,29 @@ def predict_batch():
         }, "Batch prediction completed successfully.")
         
     except Exception as e:
+        logger.error(f"Batch prediction failed: {e}")
         return error_response(f"Batch prediction failed: {e}")
-                    
-        return success_response({
-            "quadrant": quadrant,
-            "quadrant_label": "True Positive (TP)" if quadrant == 'TP' else ("False Positive (FP)" if quadrant == 'FP' else ("True Negative (TN)" if quadrant == 'TN' else "False Negative (FN)")),
-            "samples": samples,
-            "total_found": len(samples)
-        })
-    except Exception as e:
-        return error_response(f"Drilldown retrieval failed: {e}")
 
 
 # --- MODEL REGISTRY API ---
 @app.route('/api/v1/models', methods=['GET'])
+@login_required
 def get_model_registry():
     """Lists models inside registry and their lifecycle states."""
-    conn = get_db_connection()
-    query = '''
-        SELECT ej.id as job_id, ej.model_artifact_path, ej.artifact_hash, ej.artifact_lifecycle, ej.training_time,
-               e.name as exp_name, d.name as dataset_name, mc.model_type, mc.parameters,
-               ev.accuracy, ev.macro_f1
-        FROM experiment_jobs ej
-        JOIN evaluations ev ON ev.experiment_job_id = ej.id
-        JOIN experiments e ON ej.experiment_id = e.id
-        JOIN model_configs mc ON e.model_config_id = mc.id
-        JOIN datasets d ON e.dataset_id = d.id
-        WHERE ej.status = 'Completed' AND ej.model_artifact_path IS NOT NULL AND ej.artifact_lifecycle != 'Deleted'
-        ORDER BY ej.id DESC
-    '''
-    models = conn.execute(query).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        query = '''
+            SELECT ej.id as job_id, ej.model_artifact_path, ej.artifact_hash, ej.artifact_lifecycle, ej.training_time,
+                   e.name as exp_name, d.name as dataset_name, mc.model_type, mc.parameters,
+                   ev.accuracy, ev.macro_f1
+            FROM experiment_jobs ej
+            JOIN evaluations ev ON ev.experiment_job_id = ej.id
+            JOIN experiments e ON ej.experiment_id = e.id
+            JOIN model_configs mc ON e.model_config_id = mc.id
+            JOIN datasets d ON e.dataset_id = d.id
+            WHERE ej.status = 'Completed' AND ej.model_artifact_path IS NOT NULL AND ej.artifact_lifecycle != 'Deleted'
+            ORDER BY ej.id DESC
+        '''
+        models = conn.execute(query).fetchall()
     
     result = []
     for m in models:
@@ -1221,50 +1201,46 @@ def get_model_registry():
     return success_response(result)
 
 @app.route('/api/v1/models/<int:job_id>', methods=['DELETE'])
+@login_required
 def delete_model_endpoint(job_id):
     """Deletes a registered model's physical .pkl file on disk and updates database to unregister it."""
-    conn = get_db_connection()
     try:
-        # 1. Check if job exists and has a model artifact
-        job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (job_id,)).fetchone()
-        if not job:
-            conn.close()
-            return error_response("Model tidak ditemukan.", 404)
-            
-        # 2. Prevent deleting model file if job is actively running (Completed check is fine)
-        if job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
-            conn.close()
-            return error_response("Model masih dalam proses pelatihan aktif.", 400)
-            
-        # 3. Delete physical model artifact from disk
-        if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
-            try:
-                os.remove(job['model_artifact_path'])
-            except Exception as e:
-                print(f"Error removing model artifact for job {job_id}: {e}")
+        with get_db_connection() as conn:
+            # 1. Check if job exists and has a model artifact
+            job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (job_id,)).fetchone()
+            if not job:
+                return error_response("Model tidak ditemukan.", 404)
                 
-        # 4. Update the DB: set model_artifact_path = NULL, and artifact_lifecycle = 'Deleted'
-        # That way, the training history (job) remains, but the model is removed from the registry list.
-        conn.execute('''
-            UPDATE experiment_jobs 
-            SET model_artifact_path = NULL, artifact_lifecycle = 'Deleted' 
-            WHERE id = ?
-        ''', (job_id,))
-        
-        # Also clean up mcnemar results referencing this model because it cannot be evaluated anymore
-        conn.execute('DELETE FROM mcnemar_results WHERE model_a_job_id = ? OR model_b_job_id = ?', (job_id, job_id))
-        
-        conn.commit()
-        conn.close()
-        
+            # 2. Prevent deleting model file if job is actively running (Completed check is fine)
+            if job['status'] in ['Preparing', 'Downloading Model', 'Training', 'Evaluating']:
+                return error_response("Model masih dalam proses pelatihan aktif.", 400)
+                
+            # 3. Delete physical model artifact from disk
+            if job['model_artifact_path'] and os.path.exists(job['model_artifact_path']):
+                try:
+                    os.remove(job['model_artifact_path'])
+                except Exception as e:
+                    logger.warning(f"Error removing model artifact for job {job_id}: {e}")
+                    
+            # 4. Update the DB: set model_artifact_path = NULL, and artifact_lifecycle = 'Deleted'
+            # That way, the training history (job) remains, but the model is removed from the registry list.
+            conn.execute('''
+                UPDATE experiment_jobs 
+                SET model_artifact_path = NULL, artifact_lifecycle = 'Deleted' 
+                WHERE id = ?
+            ''', (job_id,))
+            
+            # Also clean up mcnemar results referencing this model because it cannot be evaluated anymore
+            conn.execute('DELETE FROM mcnemar_results WHERE model_a_job_id = ? OR model_b_job_id = ?', (job_id, job_id))
+            conn.commit()
+            
         return success_response(message="Model berhasil dihapus dari registry.")
         
     except Exception as e:
-        if conn:
-            conn.close()
         return error_response(f"Gagal menghapus model dari registry: {str(e)}")
 
 @app.route('/api/v1/models/<int:job_id>/status', methods=['POST'])
+@login_required
 def update_model_lifecycle(job_id):
     """Sets a registered model's lifecycle state (Active, Archived, Deprecated)."""
     data = request.json or {}
@@ -1273,21 +1249,20 @@ def update_model_lifecycle(job_id):
     if new_lifecycle not in ['Active', 'Archived', 'Deprecated']:
         return error_response("Invalid lifecycle state. Must be 'Active', 'Archived', or 'Deprecated'.")
         
-    conn = get_db_connection()
-    job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (job_id,)).fetchone()
-    
-    if not job:
-        conn.close()
-        return error_response("Model not found.", 404)
+    with get_db_connection() as conn:
+        job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ?', (job_id,)).fetchone()
         
-    conn.execute('UPDATE experiment_jobs SET artifact_lifecycle = ? WHERE id = ?', (new_lifecycle, job_id))
-    conn.commit()
-    conn.close()
+        if not job:
+            return error_response("Model tidak ditemukan.", 404)
+            
+        conn.execute('UPDATE experiment_jobs SET artifact_lifecycle = ? WHERE id = ?', (new_lifecycle, job_id))
+        conn.commit()
     
     return success_response(message=f"Model job {job_id} lifecycle set to '{new_lifecycle}'.")
 
 
 @app.route('/api/v1/system/toggle_mock_gpu', methods=['POST'])
+@login_required
 def toggle_mock_gpu():
     """Toggles local high-fidelity GPU monitoring simulation."""
     global MOCK_GPU_ENABLED

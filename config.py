@@ -35,16 +35,46 @@ for folder in [UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATA
 DATABASE_PATH: str = os.getenv('DATABASE_PATH', os.path.join(BASE_DIR, 'nlp_lab.db'))
 SQLALCHEMY_DATABASE_URI: str = f"sqlite:///{DATABASE_PATH}"
 
+# Server & Runtime Configuration
+FLASK_ENV: str = os.getenv('FLASK_ENV', 'development')
+DEBUG: bool = os.getenv('FLASK_DEBUG', '1' if FLASK_ENV == 'development' else '0').lower() in ('true', '1', 't')
+HOST: str = os.getenv('HOST', '0.0.0.0')
+PORT: int = int(os.getenv('PORT', '5000'))
+
 # Security & Authentication
-SECRET_KEY: str = os.getenv('SECRET_KEY', 'nlp-lab-production-secure-key-982341')
+_RAW_SECRET_KEY = os.getenv('SECRET_KEY')
+if FLASK_ENV == 'production':
+    if not _RAW_SECRET_KEY or _RAW_SECRET_KEY.strip() == '' or _RAW_SECRET_KEY == 'nlp-lab-production-secure-key-982341':
+        raise RuntimeError(
+            "FATAL CONFIG ERROR: SECRET_KEY environment variable is missing or insecure in production mode. "
+            "Please configure a strong, random 64-character SECRET_KEY in your .env file or server environment."
+        )
+    SECRET_KEY: str = _RAW_SECRET_KEY
+else:
+    if not _RAW_SECRET_KEY:
+        import secrets
+        SECRET_KEY: str = secrets.token_hex(32)
+        logging.warning(
+            "[CONFIG WARNING] SECRET_KEY not provided in environment. "
+            "Generated temporary on-the-fly key for development. DO NOT use this for production."
+        )
+    else:
+        SECRET_KEY: str = _RAW_SECRET_KEY
+
 GOOGLE_CLIENT_ID: str = os.getenv('GOOGLE_CLIENT_ID', '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com')
 MAX_CONTENT_LENGTH: int = int(os.getenv('MAX_CONTENT_LENGTH', str(15 * 1024 * 1024)))  # 15 MB
 
-# Server & Runtime Configuration
-FLASK_ENV: str = os.getenv('FLASK_ENV', 'production')
-DEBUG: bool = os.getenv('FLASK_DEBUG', '0').lower() in ('true', '1', 't')
-HOST: str = os.getenv('HOST', '0.0.0.0')
-PORT: int = int(os.getenv('PORT', '5000'))
+# CORS Allowed Origins
+_RAW_ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS')
+if _RAW_ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = [orig.strip() for orig in _RAW_ALLOWED_ORIGINS.split(',') if orig.strip()]
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:3000",
+        "https://gotten-kinsman-drained.ngrok-free.dev"
+    ]
 
 # Model Inference Cache Configuration
 MODEL_CACHE_SIZE: int = int(os.getenv('MODEL_CACHE_SIZE', '10'))

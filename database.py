@@ -134,6 +134,7 @@ def init_db() -> None:
             experiment_id INTEGER NOT NULL,
             celery_task_id TEXT, -- Background Thread / Task ID
             status TEXT NOT NULL, -- 'Preparing', 'Downloading Model', 'Training', 'Evaluating', 'Completed', 'Cancelled', 'Failed'
+            cancel_requested INTEGER DEFAULT 0,
             retry_count INTEGER DEFAULT 0,
             training_time REAL, -- in seconds
             failure_reason TEXT,
@@ -179,7 +180,12 @@ def init_db() -> None:
     ''')
 
     # Safe column migrations
-    for col, table in [("y_test TEXT", "evaluations"), ("y_pred TEXT", "evaluations"), ("split_config TEXT", "experiments")]:
+    for col, table in [
+        ("cancel_requested INTEGER DEFAULT 0", "experiment_jobs"),
+        ("y_test TEXT", "evaluations"),
+        ("y_pred TEXT", "evaluations"),
+        ("split_config TEXT", "experiments")
+    ]:
         try:
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
         except sqlite3.OperationalError:
@@ -243,16 +249,30 @@ def init_db() -> None:
                 hashed = hash_password(pwd)
                 cursor.execute('UPDATE users SET password = ? WHERE id = ?', (hashed, user['id']))
 
+    # 8. Stale Job Recovery: Clean up any non-final jobs interrupted by server restart/shutdown
+    now_iso = datetime.now().isoformat()
+    cursor.execute('''
+        UPDATE experiment_jobs
+        SET status = 'Failed',
+            failure_reason = 'Interrupted by server restart',
+            completed_at = COALESCE(completed_at, ?)
+        WHERE status NOT IN ('Completed', 'Failed', 'Cancelled')
+    ''', (now_iso,))
+    recovered_count = cursor.rowcount
+    if recovered_count > 0:
+        logger.info(f"Recovered {recovered_count} stale experiment jobs interrupted by previous server lifecycle.")
+
     conn.commit()
     conn.close()
     logger.info("Database schema, performance indexes, and migrations applied successfully.")
 
 
-# Initialize DB when this module is imported/run
-if __name__ == '__main__':
+# Initialize and migrate DB when module is loaded or executed
+try:
     init_db()
+except Exception as e:
+    logger.warning(f"Initial DB check warning: {e}")
+
+if __name__ == '__main__':
     print("Database initialized successfully at:", DATABASE_PATH)
-else:
-    if not os.path.exists(DATABASE_PATH):
-        init_db()
 

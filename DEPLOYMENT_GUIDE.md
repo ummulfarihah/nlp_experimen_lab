@@ -30,7 +30,11 @@ HOST=0.0.0.0
 PORT=5000
 
 # Generate kunci acak 64-karakter dengan: python -c "import secrets; print(secrets.token_hex(32))"
+# WAJIB diisi saat FLASK_ENV=production (aplikasi akan fail-fast jika kosong atau default)
 SECRET_KEY=masukkan_secret_key_yang_sangat_kuat_disini
+
+# Whitelist Domain CORS (pisahkan dengan koma)
+ALLOWED_ORIGINS=https://domain-anda.com,http://localhost:5000
 
 # Lokasi Database SQLite
 DATABASE_PATH=nlp_lab.db
