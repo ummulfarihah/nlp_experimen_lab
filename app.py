@@ -84,7 +84,7 @@ def add_security_headers(response):
 def handle_not_found(e):
     if request.path.startswith('/api/'):
         return jsonify({"success": False, "error": "Endpoint tidak ditemukan"}), 404
-    return render_template('index.html'), 200
+    return render_template('index.html', google_client_id=GOOGLE_CLIENT_ID), 200
 
 @app.errorhandler(413)
 def handle_large_file(e):
@@ -119,7 +119,7 @@ def offline():
 def index(path=None):
     if path and path.startswith(('api/', 'static/')):
         return jsonify({"success": False, "error": "Not Found"}), 404
-    return render_template('index.html')
+    return render_template('index.html', google_client_id=GOOGLE_CLIENT_ID)
 
 @app.route('/api/v1/health', methods=['GET'])
 def health_check():

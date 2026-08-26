@@ -466,6 +466,67 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         .finally(() => hideLoader());
 });
 
+// --- GOOGLE OAUTH 2.0 INTEGRATION ---
+window.handleGoogleCredentialResponse = function(response) {
+    if (!response || !response.credential) {
+        showToast("Gagal menerima token kredensial Google.", true);
+        return;
+    }
+    showLoader();
+    fetch('/api/v1/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.success && res.data) {
+            showToast("Berhasil masuk dengan Akun Google!");
+            setAuthenticatedUser(res.data);
+        } else {
+            showToast(res.error || "Gagal autentikasi dengan Google.", true);
+        }
+    })
+    .catch(() => {
+        showToast("Terjadi kesalahan koneksi saat login Google.", true);
+    })
+    .finally(() => {
+        hideLoader();
+    });
+};
+
+function initGoogleAuth() {
+    const clientId = window.GOOGLE_CLIENT_ID || '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com';
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: window.handleGoogleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+            const btnContainer = document.getElementById('google-signin-btn-container');
+            if (btnContainer) {
+                btnContainer.innerHTML = '';
+                google.accounts.id.renderButton(btnContainer, {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    shape: 'pill',
+                    text: 'signin_with',
+                    logo_alignment: 'left',
+                    width: 320
+                });
+            }
+        } catch (e) {
+            console.warn("Google Sign-In initialization failed:", e);
+        }
+    } else {
+        setTimeout(initGoogleAuth, 500);
+    }
+}
+
+
 
 // --- USER PROFILE & PASSWORD MANAGEMENT ---
 function loadUserProfile() {
@@ -2632,6 +2693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSidebarState();
     checkAuthentication();
     initStaticCustomDropdowns();
+    initGoogleAuth();
 });
 
 // --- BACKEND HEALTH CHECK & SERVER OFFLINE INTERCEPTOR ---

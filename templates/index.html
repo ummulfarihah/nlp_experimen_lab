@@ -22,6 +22,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- ApexCharts CDN -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Google Identity Services (GSI) OAuth 2.0 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Favicons & PWA Icons (Icon-only Squircle) -->
     <link rel="icon" type="image/png" sizes="512x512" href="/static/img/pwa-icon-512.png?v=75.0">
     <link rel="icon" type="image/png" sizes="192x192" href="/static/img/pwa-icon-192.png?v=75.0">
@@ -1198,7 +1200,16 @@
                 <button type="submit" class="btn btn-primary w-full py-3" id="btn-real-login-submit">Masuk ke Lab</button>
             </form>
 
-            <div class="login-footer flex flex-col items-center mt-6 pt-5 border-t border-warm-gray text-[10px] text-rose-mauve">
+            <div class="my-4 flex items-center justify-between">
+                <hr class="w-full border-pink/15">
+                <span class="px-3 text-2xs text-rose-mauve font-semibold uppercase tracking-wider">atau</span>
+                <hr class="w-full border-pink/15">
+            </div>
+
+            <!-- GOOGLE OAUTH SIGN-IN BUTTON CONTAINER -->
+            <div id="google-signin-btn-container" class="w-full flex justify-center mt-1 min-h-[44px]"></div>
+
+            <div class="login-footer flex flex-col items-center mt-5 pt-4 border-t border-warm-gray text-[10px] text-rose-mauve">
                 <div class="footer-version">Version 2.0 • Ummu NLP Lab</div>
             </div>
         </div>
@@ -1408,7 +1419,7 @@
         });
     </script>
     <!-- Custom JS controllers -->
-    <script src="/static/js/charts.js?v=110.0"></script>
-    <script src="/static/js/app.js?v=110.0"></script>
+    <script src="/static/js/charts.js?v=111.0"></script>
+    <script src="/static/js/app.js?v=111.0"></script>
 </body>
 </html>

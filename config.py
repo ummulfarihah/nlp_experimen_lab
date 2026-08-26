@@ -37,7 +37,7 @@ SQLALCHEMY_DATABASE_URI: str = f"sqlite:///{DATABASE_PATH}"
 
 # Security & Authentication
 SECRET_KEY: str = os.getenv('SECRET_KEY', 'nlp-lab-production-secure-key-982341')
-GOOGLE_CLIENT_ID: str = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_ID: str = os.getenv('GOOGLE_CLIENT_ID', '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com')
 MAX_CONTENT_LENGTH: int = int(os.getenv('MAX_CONTENT_LENGTH', str(15 * 1024 * 1024)))  # 15 MB
 
 # Server & Runtime Configuration

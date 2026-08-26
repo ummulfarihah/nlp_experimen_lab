@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ummu-nlp-lab-v110.0';
+const CACHE_NAME = 'ummu-nlp-lab-v111.0';
 const OFFLINE_URL = '/static/offline.html';
 
 const STATIC_ASSETS = [
