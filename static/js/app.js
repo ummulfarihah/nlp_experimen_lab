@@ -85,6 +85,27 @@ function hideToastImmediately() {
 }
 window.hideToastImmediately = hideToastImmediately;
 
+// Global Empty State Renderer for Tables (Consistent Centered Glassmorphism Design)
+function renderEmptyTableState(tbody, colspan, icon, title, subtitle = '') {
+    if (!tbody) return;
+    tbody.innerHTML = `
+        <tr class="empty-table-row">
+            <td colspan="${colspan}" class="empty-table-cell">
+                <div class="empty-state-content">
+                    <div class="empty-state-icon-wrap">
+                        <i data-lucide="${icon}" class="w-6 h-6 text-pink"></i>
+                    </div>
+                    <p class="empty-state-title">${title}</p>
+                    ${subtitle ? `<p class="empty-state-subtitle">${subtitle}</p>` : ''}
+                </div>
+            </td>
+        </tr>
+    `;
+    if (window.lucide) {
+        lucide.createIcons({ root: tbody });
+    }
+}
+
 // Global Custom Confirmation Modal Helper
 let confirmPromiseResolve = null;
 
@@ -776,7 +797,13 @@ function fetchDatasetsList() {
                 tbody.innerHTML = '';
                 
                 if (STATE.datasets.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-rose-mauve py-6">Belum ada dataset diunggah. Unggah CSV baru di samping.</td></tr>';
+                    renderEmptyTableState(
+                        tbody,
+                        5,
+                        'database',
+                        'Belum Ada Dataset Diunggah',
+                        'Silakan unggah berkas CSV dataset baru melalui panel di samping untuk memulai eksperimen.'
+                    );
                     return;
                 }
                 
@@ -896,6 +923,17 @@ function inspectDataset(id) {
             if (res.success) {
                 const tbody = document.getElementById('dataset-preview-rows');
                 tbody.innerHTML = '';
+                
+                if (!res.data || res.data.length === 0) {
+                    renderEmptyTableState(
+                        tbody,
+                        2,
+                        'file-text',
+                        'Tidak Ada Data Pratinjau',
+                        'Dataset ini kosong atau tidak memiliki baris data yang valid.'
+                    );
+                    return;
+                }
                 
                 res.data.forEach(row => {
                     const tr = document.createElement('tr');
@@ -1609,7 +1647,13 @@ function fetchJobsHistory() {
                 tbody.innerHTML = '';
                 
                 if (STATE.jobs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-rose-mauve py-6">Belum ada riwayat training.</td></tr>';
+                    renderEmptyTableState(
+                        tbody,
+                        9,
+                        'cpu',
+                        'Belum Ada Riwayat Training',
+                        'Konfigurasikan parameter dan mulai proses pelatihan model baru pada panel formulir di atas.'
+                    );
                     return;
                 }
                 
@@ -1720,7 +1764,13 @@ function fetchRankingsList() {
                 tbody.innerHTML = '';
                 
                 if (evals.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-rose-mauve py-6">Belum ada model terevaluasi. Selesaikan training model terlebih dahulu.</td></tr>';
+                    renderEmptyTableState(
+                        tbody,
+                        9,
+                        'trophy',
+                        'Belum Ada Model Terevaluasi',
+                        'Selesaikan pelatihan model terlebih dahulu untuk melihat papan peringkat performa dan metrik komparasi.'
+                    );
                     return;
                 }
                 
@@ -2317,7 +2367,13 @@ function fetchModelRegistry() {
                 tbody.innerHTML = '';
                 
                 if (models.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-rose-mauve py-6">Belum ada model di registry.</td></tr>';
+                    renderEmptyTableState(
+                        tbody,
+                        8,
+                        'archive',
+                        'Belum Ada Model di Registry',
+                        'Model yang telah selesai dilatih dan terevaluasi akan secara otomatis terdaftar pada repositori ini.'
+                    );
                     return;
                 }
                 
