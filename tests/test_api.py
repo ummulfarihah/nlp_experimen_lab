@@ -27,7 +27,7 @@ def auth_client(client):
             "name": "Administrator",
             "picture": "",
             "role": "Administrator",
-            "institution": "Universitas Muhammadiyah Malang"
+            "institution": "Universitas Muhammadiyah Sumatera Utara"
         }
     return client
 

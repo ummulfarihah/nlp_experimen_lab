@@ -607,7 +607,7 @@ function loadUserProfile() {
                 document.getElementById('profile-display-avatar').src = user.picture || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=256";
                 document.getElementById('profile-sidebar-name').textContent = user.name;
                 document.getElementById('profile-sidebar-role').textContent = user.role || 'Administrator';
-                document.getElementById('profile-sidebar-institution').textContent = user.institution || 'Universitas Muhammadiyah Malang';
+                document.getElementById('profile-sidebar-institution').textContent = user.institution || 'Universitas Muhammadiyah Sumatera Utara';
                 
                 // Update Sidebar
                 document.getElementById('user-display-name').textContent = user.name;

@@ -253,7 +253,7 @@ def init_db() -> None:
             "ummulfarihah20@gmail.com",
             "Administrator",
             hash_password("admin123"),
-            "Universitas Muhammadiyah Malang",
+            "Universitas Muhammadiyah Sumatera Utara",
             "Administrator",
             "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=256"
         ))
@@ -264,6 +264,9 @@ def init_db() -> None:
             if not pwd.startswith(('pbkdf2:', 'scrypt:', 'argon2:')):
                 hashed = hash_password(pwd)
                 cursor.execute('UPDATE users SET password = ? WHERE id = ?', (hashed, user['id']))
+
+    # Migrate institution name to Universitas Muhammadiyah Sumatera Utara
+    cursor.execute("UPDATE users SET institution = 'Universitas Muhammadiyah Sumatera Utara' WHERE institution = 'Universitas Muhammadiyah Malang' OR institution = '' OR institution IS NULL")
 
     # 8. Stale Job Recovery: Clean up any non-final jobs interrupted by server restart/shutdown
     now_iso = datetime.now().isoformat()
