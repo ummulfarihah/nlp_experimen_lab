@@ -2,8 +2,14 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NLP Experiment Lab - Clean Minimalist Web App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Ummu NLP Lab">
+    <title>Ummu NLP Lab</title>
+    <!-- PWA Web Manifest -->
+    <link rel="manifest" href="/manifest.json">
     <!-- Meta Descriptions for SEO -->
     <meta name="description" content="NLP Experiment Lab adalah platform penelitian berbasis web untuk melakukan eksperimen klasifikasi teks Bahasa Indonesia menggunakan Naive Bayes, SVM, dan IndoBERT.">
     <!-- Google Fonts -->
@@ -12,18 +18,47 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- ApexCharts CDN -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Favicons & PWA Icons (Icon-only Squircle) -->
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/img/pwa-icon-512.png?v=75.0">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/img/pwa-icon-192.png?v=75.0">
+    <link rel="icon" type="image/png" sizes="128x128" href="/static/img/favicon-128.png?v=75.0">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon-64.png?v=75.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon.png?v=75.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png?v=75.0">
+    <meta name="theme-color" content="#FFF0F5">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=103.0">
 </head>
 <body class="bg-blush text-dark font-outfit">
 
-    <!-- Global App Loader -->
-    <div id="global-loader" class="loader-container">
-        <div class="loader-spinner"></div>
+    <!-- PWA / APP LAUNCH SPLASH LOADING SCREEN -->
+    <div id="app-splash-screen" class="app-splash-screen">
+        <div class="app-splash-content text-center">
+            <div class="app-splash-logo-wrap">
+                <img src="/static/img/logo.png?v=75.0" alt="Ummu NLP Lab" class="app-splash-logo">
+            </div>
+            <div class="app-splash-loader">
+                <div class="app-splash-progress"></div>
+            </div>
+            <span class="app-splash-tagline">Memuat Platform NLP Lab...</span>
+        </div>
+    </div>
+
+    <!-- Unified In-App Action & Page Loader (Identical to Web App Launch Screen) -->
+    <div id="global-loader" class="loader-container" role="status" aria-live="polite" style="opacity: 0; pointer-events: none;">
+        <div class="page-loader-card">
+            <div class="page-loader-logo-wrap">
+                <img src="/static/img/logo.png?v=75.0" alt="Ummu NLP Lab" class="page-loader-logo">
+            </div>
+            <div class="app-splash-loader">
+                <div class="app-splash-progress"></div>
+            </div>
+            <span class="page-loader-text">Memproses Data...</span>
+        </div>
     </div>
 
     <!-- Notification Toast -->
-    <div id="toast" class="toast hidden">
+    <div id="toast" class="toast hidden" role="alert" aria-live="assertive" aria-atomic="true">
         <span id="toast-message">Notifikasi</span>
     </div>
 
@@ -31,70 +66,62 @@
     <div id="app-wrapper" class="app-layout hidden">
         
         <!-- SIDEBAR NAVIGATION -->
-        <aside class="sidebar">
+        <aside class="sidebar" role="navigation" aria-label="Menu utama">
             <div class="sidebar-header">
-                <div class="logo-container">
-                    <div class="logo-icon">
-                        <i data-lucide="flower" class="text-pink"></i>
-                    </div>
-                    <div class="logo-text">
-                        <span class="font-bold text-lg">Ummu</span>
-                        <span class="text-xs text-rose-mauve block mt-[-4px]">NLP Lab</span>
-                    </div>
-                </div>
+                <a href="/dashboard" class="sidebar-logo-link block">
+                    <img src="/static/img/logo.png?v=75.0" alt="Ummu NLP Lab" class="sidebar-brand-full-logo">
+                    <img src="/static/img/favicon-64.png?v=75.0" alt="Ummu NLP Lab" class="sidebar-brand-mini-logo hidden">
+                </a>
             </div>
             
             <nav class="sidebar-menu">
-                <a href="#dashboard" class="menu-item active" id="nav-dashboard">
+                <a href="/dashboard" class="menu-item active" id="nav-dashboard" data-tooltip="Dashboard">
                     <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
                 </a>
-                <a href="#datasets" class="menu-item" id="nav-datasets">
+                <a href="/datasets" class="menu-item" id="nav-datasets" data-tooltip="Dataset Manager">
                     <i data-lucide="database"></i> <span>Dataset Manager</span>
                 </a>
-                <a href="#preprocess" class="menu-item" id="nav-preprocess">
-                    <i data-lucide="terminal"></i> <span>Classic Preprocessing</span>
+                <a href="/preprocess" class="menu-item" id="nav-preprocess" data-tooltip="Preprocessing Lab">
+                    <i data-lucide="terminal"></i> <span>Preprocessing Lab</span>
                 </a>
-                <a href="#preprocess-bert" class="menu-item" id="nav-preprocess-bert">
-                    <i data-lucide="layers"></i> <span>BERT Preprocessing</span>
-                </a>
-                <a href="#training" class="menu-item" id="nav-training">
+                <a href="/training" class="menu-item" id="nav-training" data-tooltip="Model Training">
                     <i data-lucide="cpu"></i> <span>Model Training</span>
                 </a>
-                <a href="#evaluations" class="menu-item" id="nav-evaluations">
+                <a href="/evaluations" class="menu-item" id="nav-evaluations" data-tooltip="Evaluation Lab">
                     <i data-lucide="bar-chart-3"></i> <span>Evaluation Lab</span>
                 </a>
-                <a href="#mcnemar" class="menu-item" id="nav-mcnemar">
+                <a href="/mcnemar" class="menu-item" id="nav-mcnemar" data-tooltip="McNemar Test">
                     <i data-lucide="scale"></i> <span>McNemar Test</span>
                 </a>
-                <a href="#prediction" class="menu-item" id="nav-prediction">
+                <a href="/prediction" class="menu-item" id="nav-prediction" data-tooltip="Prediction Lab">
                     <i data-lucide="wand2"></i> <span>Prediction Lab</span>
                 </a>
-                <a href="#registry" class="menu-item" id="nav-registry">
+                <a href="/registry" class="menu-item" id="nav-registry" data-tooltip="Model Registry">
                     <i data-lucide="archive"></i> <span>Model Registry</span>
                 </a>
             </nav>
             
             <!-- User Section / Footer of Sidebar -->
             <div class="sidebar-footer">
-                <div class="user-profile">
+                <div class="user-profile" data-tooltip="Profil Peneliti">
                     <img id="user-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256" alt="User Avatar" class="profile-img">
                     <div class="user-info">
                         <p class="user-name font-semibold" id="user-display-name">Researcher</p>
                         <p class="user-role text-xs text-rose-mauve" id="user-display-role">Lead Scientist</p>
                     </div>
                 </div>
-                <button id="btn-logout" class="btn-logout-icon" title="Keluar">
+                <button id="btn-logout" class="btn-logout-icon" title="Keluar" data-tooltip="Keluar">
                     <i data-lucide="log-out"></i>
                 </button>
             </div>
         </aside>
 
         <!-- MAIN CONTENT AREA -->
-        <main class="main-content">
+        <main class="main-content" role="main">
             <!-- Header bar -->
             <header class="content-header">
                 <div class="header-left">
-                    <button id="sidebar-toggle" class="sidebar-toggle-btn md:hidden">
+                    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Kecilkan / Perluas Sidebar" title="Kecilkan / Perluas Sidebar">
                         <i data-lucide="menu"></i>
                     </button>
                     <h1 id="view-title" class="page-title text-2xl font-bold">Dashboard</h1>
@@ -102,7 +129,7 @@
                 
                 <div class="header-right">
                     <!-- Refresh DB indicator -->
-                    <button id="btn-sync" class="btn-icon" title="Sinkronisasi Data">
+                    <button id="btn-sync" class="btn-icon" aria-label="Sinkronisasi Data Real-Time" title="Sinkronisasi Data">
                         <i data-lucide="refresh-cw"></i>
                     </button>
                 </div>
@@ -113,6 +140,26 @@
 
                 <!-- 1. DASHBOARD VIEW -->
                 <section id="view-dashboard" class="view-section">
+                    <!-- Hero Welcome Banner -->
+                    <div class="welcome-hero-banner mb-6">
+                        <div class="welcome-hero-content">
+                            <div class="welcome-badge">
+                                <span class="radar-ping-dot mr-1"></span>
+                                <span>NLP RESEARCH PLATFORM v2.0</span>
+                            </div>
+                            <h2 class="welcome-title font-bold text-2xl md:text-3xl text-white mt-2 mb-1">Eksperimen Komparasi Analisis Sentimen</h2>
+                            <p class="welcome-subtitle text-sm text-white opacity-90 max-w-2xl">Platform pengujian komparatif algoritma Classic Machine Learning (Naive Bayes & SVM) vs Pretrained Transformer (IndoBERT) untuk analisis sentimen berbahasa Indonesia.</p>
+                        </div>
+                        <div class="welcome-actions">
+                            <button class="btn btn-hero-primary" onclick="location.hash='#preprocess'">
+                                <i data-lucide="terminal" class="w-4 h-4 mr-2 inline"></i>Uji Preprocessing Lab
+                            </button>
+                            <button class="btn btn-hero-secondary" onclick="location.hash='#training'">
+                                <i data-lucide="cpu" class="w-4 h-4 mr-2 inline"></i>Mulai Training Model
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Cards Grid -->
                     <div class="metrics-grid">
                         <div class="metric-card card-hover clickable-card" onclick="location.hash='#datasets'">
@@ -135,7 +182,7 @@
 
                         <div class="metric-card card-hover clickable-card" onclick="location.hash='#training'">
                             <div class="metric-card-header">
-                                <span class="text-xs text-rose-mauve tracking-wider font-semibold uppercase">Active Jobs</span>
+                                <span class="text-xs text-rose-mauve tracking-wider font-semibold uppercase">Pekerjaan Aktif</span>
                                 <div class="metric-icon-bg bg-soft-pink"><i data-lucide="cpu" class="text-pink"></i></div>
                             </div>
                             <h2 class="metric-value font-bold text-3xl mt-2" id="dash-job-count">0</h2>
@@ -144,7 +191,7 @@
 
                         <div class="metric-card card-hover">
                             <div class="metric-card-header">
-                                <span class="text-xs text-rose-mauve tracking-wider font-semibold uppercase">Device Accel</span>
+                                <span class="text-xs text-rose-mauve tracking-wider font-semibold uppercase">Akselerasi Perangkat</span>
                                 <div class="metric-icon-bg bg-soft-pink"><i data-lucide="zap" class="text-pink"></i></div>
                             </div>
                             <h2 class="metric-value font-bold text-xl mt-3 text-rose-mauve" id="dash-device-name">GPU tidak tersedia</h2>
@@ -154,26 +201,26 @@
                         </div>
                     </div>
 
-                    <!-- System Resource Monitoring -->
+                    <!-- System Resource Monitoring & Active Experiments -->
                     <div class="dashboard-panels-grid mt-6">
-                        <div class="panel-card col-span-2">
-                            <h3 class="panel-title mb-4"><i data-lucide="activity" class="inline-block w-4 h-4 mr-2"></i>Resource Monitoring</h3>
+                        <div class="panel-card">
+                            <h3 class="panel-title mb-4"><i data-lucide="activity" class="inline-block w-4 h-4 mr-2"></i>Pemantauan Sumber Daya Sistem</h3>
                             <div class="resource-metrics-grid">
                                 <div class="resource-circular-item">
                                     <div id="cpu-chart"></div>
-                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">CPU Usage</span>
+                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">Penggunaan CPU</span>
                                 </div>
                                 <div class="resource-circular-item">
                                     <div id="ram-chart"></div>
-                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">RAM Usage</span>
+                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">Penggunaan RAM</span>
                                 </div>
                                 <div class="resource-circular-item">
                                     <div id="disk-chart"></div>
-                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">Disk Storage</span>
+                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">Penyimpanan Disk</span>
                                 </div>
                                 <div class="resource-circular-item">
                                     <div id="gpu-chart"></div>
-                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">GPU Load</span>
+                                    <span class="resource-label mt-[-10px] block text-sm font-semibold">Beban GPU</span>
                                 </div>
                             </div>
                         </div>
@@ -191,15 +238,15 @@
 
                 <!-- 2. DATASETS VIEW -->
                 <section id="view-datasets" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                    <div class="datasets-grid">
                         <!-- Upload Panel -->
                         <div class="panel-card">
                             <h3 class="panel-title mb-4"><i data-lucide="upload-cloud" class="inline-block w-4 h-4 mr-2 text-pink"></i>Unggah Dataset Baru</h3>
                             <div class="upload-dropzone" id="dataset-dropzone">
                                 <i data-lucide="file-spreadsheet" class="w-12 h-12 text-pink mb-3"></i>
-                                <p class="text-sm font-semibold mb-1">Seret & letakkan file CSV Anda di sini</p>
+                                <p class="text-sm font-semibold mb-1">Seret dan lepas berkas CSV Anda di sini</p>
                                 <p class="text-xs text-rose-mauve mb-4">Mendukung format kolom 'text' dan 'label'</p>
-                                <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Pilih File CSV</button>
+                                <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Pilih Berkas CSV</button>
                                 <input type="file" id="file-input" class="hidden" accept=".csv">
                             </div>
                             <!-- Upload progress -->
@@ -210,15 +257,15 @@
                         </div>
 
                         <!-- Datasets List -->
-                        <div class="panel-card col-span-2">
+                        <div class="panel-card">
                             <h3 class="panel-title mb-4"><i data-lucide="layers" class="inline-block w-4 h-4 mr-2 text-pink"></i>Daftar Dataset Terdaftar</h3>
                             <div class="table-container">
-                                <table class="table" id="table-datasets">
+                                <table class="table table-to-card" id="table-datasets">
                                     <thead>
                                         <tr>
                                             <th>Nama Dataset</th>
                                             <th>Total Baris</th>
-                                            <th>Upload Pada</th>
+                                            <th>Waktu Unggah</th>
                                             <th>Hash (SHA256)</th>
                                             <th>Aksi</th>
                                         </tr>
@@ -234,26 +281,26 @@
                     <!-- Dataset Preview & Stats Modal / Section -->
                     <div id="dataset-details-panel" class="panel-card mt-6 hidden">
                         <div class="panel-header mb-4">
-                            <h3 class="panel-title"><i data-lucide="pie-chart" class="inline-block w-4 h-4 mr-2 text-pink"></i>Statistik & Preview: <span id="preview-dataset-name">nama</span></h3>
+                            <h3 class="panel-title flex items-center"><i data-lucide="pie-chart" class="inline-block w-4 h-4 mr-2 text-pink"></i>Statistik &amp; Preview:&nbsp;<span id="preview-dataset-name" class="font-mono text-pink">nama</span></h3>
                             <button class="btn-icon" onclick="document.getElementById('dataset-details-panel').classList.add('hidden')"><i data-lucide="x"></i></button>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Class distribution Chart -->
-                            <div>
-                                <h4 class="text-sm font-semibold mb-2">Distribusi Kelas Dataset</h4>
+                        <div class="dataset-preview-grid">
+                            <!-- Left Sub-section: Class distribution Chart -->
+                            <div class="dataset-preview-chart-col">
+                                <h4 class="text-sm font-bold text-dark mb-3">Distribusi Kelas Dataset</h4>
                                 <div id="dataset-class-chart"></div>
                             </div>
                             
-                            <!-- Preview Data -->
-                            <div>
-                                <h4 class="text-sm font-semibold mb-2">Preview Data (10 Baris Pertama)</h4>
+                            <!-- Right Sub-section: Preview Data -->
+                            <div class="dataset-preview-table-col">
+                                <h4 class="text-sm font-bold text-dark mb-3">Preview Data (10 Baris Pertama)</h4>
                                 <div class="table-container small-table">
-                                    <table class="table">
+                                    <table class="table table-to-card" id="table-dataset-preview">
                                         <thead>
                                             <tr>
-                                                <th style="width: 70%">Teks</th>
-                                                <th>Label</th>
+                                                <th style="width: 75%; text-align: left;">Teks</th>
+                                                <th style="width: 25%; text-align: center;">Label</th>
                                             </tr>
                                         </thead>
                                         <tbody id="dataset-preview-rows">
@@ -266,120 +313,190 @@
                     </div>
                 </section>
 
-                <!-- 3. PREPROCESSING LAB VIEW -->
+                <!-- 3. UNIFIED PREPROCESSING LAB VIEW (SIMULTANEOUS SIDE-BY-SIDE) -->
                 <section id="view-preprocess" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
-                        <div class="panel-card">
-                            <h3 class="panel-title mb-4"><i data-lucide="cpu" class="inline-block w-4 h-4 mr-2 text-pink"></i>Uji Preprocessing Bahasa Indonesia</h3>
-                            <div class="form-group mb-4">
-                                <label for="preprocess-input" class="form-label">Masukkan Kalimat Khas Bahasa Indonesia</label>
-                                <textarea id="preprocess-input" class="form-textarea h-32" placeholder="Contoh: 'Saya sedang mendengarkan pidato dari bapak Presiden di dpr yang sangat menakjubkan sekali!'"></textarea>
-                            </div>
-                            <button id="btn-run-preprocess" class="btn btn-primary w-full"><i data-lucide="play" class="inline w-4 h-4 mr-2"></i>Jalankan Preprocessing</button>
+                    <!-- Unified Input Section -->
+                    <div class="panel-card mb-6">
+                        <div class="mb-4">
+                            <h3 class="panel-title font-bold text-dark">
+                                <i data-lucide="edit-3" class="inline-block w-4 h-4 mr-2 text-pink"></i>Uji Preprocessing Teks
+                            </h3>
                         </div>
 
-                        <!-- Step-by-step Output terminal -->
-                        <div class="panel-card col-span-2">
-                            <h3 class="panel-title mb-4"><i data-lucide="terminal" class="inline-block w-4 h-4 mr-2 text-purple"></i>Output Terminal Preprocessing</h3>
+                        <div class="form-group mb-4">
+                            <label for="preprocess-input" class="form-label">Masukkan Kalimat</label>
+                            <textarea id="preprocess-input" class="form-textarea" rows="4" placeholder="Ketik atau tempel kalimat di sini untuk diuji..."></textarea>
+                            <!-- Hidden synced input for backward compatibility -->
+                            <textarea id="preprocess-bert-input" class="hidden"></textarea>
+                        </div>
+
+                        <div class="preprocess-actions flex flex-wrap items-center justify-end gap-3 w-full">
+                            <button type="button" class="btn btn-secondary btn-preprocess-reset" onclick="document.getElementById('preprocess-input').value=''; document.getElementById('preprocess-bert-input').value=''; showToast('Teks dibersihkan.');" title="Bersihkan Teks">
+                                <i data-lucide="trash-2" class="inline w-4 h-4 mr-2"></i>Bersihkan
+                            </button>
+                            <button id="btn-run-preprocess" class="btn btn-primary btn-premium btn-preprocess-run">
+                                <i data-lucide="play" class="inline w-4 h-4 mr-2"></i>Jalankan Preprocessing
+                            </button>
+                            <!-- Secondary hidden buttons for direct invocation -->
+                            <button id="btn-run-preprocess-bert" class="hidden"></button>
+                            <button id="btn-run-preprocess-compare" class="hidden" onclick="runPreprocessCompare()"></button>
+                        </div>
+                    </div>
+
+                    <!-- SIMULTANEOUS SIDE-BY-SIDE TERMINALS -->
+                    <div class="compare-grid">
+                        <!-- LEFT COLUMN: CLASSIC NLP PIPELINE TERMINAL -->
+                        <div class="panel-card">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="panel-title font-bold">
+                                    <i data-lucide="cpu" class="inline-block w-4 h-4 mr-2 text-pink"></i>Classic NLP
+                                </h3>
+                                <span class="pipeline-badge pipeline-badge-classic">Bag-of-Words</span>
+                            </div>
                             
                             <div class="terminal-container">
                                 <div class="terminal-step" id="step-0">
                                     <span class="terminal-number">0</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">INPUT RAW:</span>
+                                        <div class="terminal-label">
+                                            <span>INPUT RAW:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('classic-0')" title="Penjelasan Tahap 0: Input Mentah">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text" id="term-raw">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="step-1">
                                     <span class="terminal-number">1</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">CASE FOLDING & NOISE REMOVAL:</span>
+                                        <div class="terminal-label">
+                                            <span>CASE FOLDING & NOISE REMOVAL:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('classic-1')" title="Penjelasan Tahap 1: Case Folding & Noise Removal">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text text-pink" id="term-casefolded">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="step-2">
                                     <span class="terminal-number">2</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">TOKENIZATION & SLANG NORMALIZATION:</span>
+                                        <div class="terminal-label">
+                                            <span>TOKENIZATION & SLANG NORMALIZATION:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('classic-2')" title="Penjelasan Tahap 2: Tokenization & Slang Normalization">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text text-purple" id="term-tokens">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="step-3">
                                     <span class="terminal-number">3</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">STOPWORDS REMOVAL (SELECTIVE):</span>
+                                        <div class="terminal-label">
+                                            <span>STOPWORD REMOVAL:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('classic-3')" title="Penjelasan Tahap 3: Selective Stopwords Removal">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text text-rose-mauve" id="term-stopwords">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="step-4">
                                     <span class="terminal-number">4</span>
-                                    <div class="terminal-content bg-soft-pink text-dark border-pink">
-                                        <span class="terminal-label">FINAL PREPROCESSED TEXT:</span>
-                                        <p class="terminal-text font-bold" id="term-processed">-</p>
+                                    <div class="terminal-content">
+                                        <div class="terminal-label">
+                                            <span class="text-dark font-bold">HASIL PREPROCESSING:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('classic-4')" title="Penjelasan Tahap 4: Representasi Akhir">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
+                                        <div class="terminal-result-box">
+                                            <p class="terminal-text font-bold" id="term-processed">-</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </section>
 
-                <!-- 3B. BERT PREPROCESSING LAB VIEW -->
-                <section id="view-preprocess-bert" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                        <!-- RIGHT COLUMN: INDOBERT PIPELINE TERMINAL -->
                         <div class="panel-card">
-                            <h3 class="panel-title mb-4"><i data-lucide="layers" class="inline-block w-4 h-4 mr-2 text-pink"></i>Uji Preprocessing BERT (WordPiece)</h3>
-                            <div class="form-group mb-4">
-                                <label for="preprocess-bert-input" class="form-label">Masukkan Kalimat Khas Bahasa Indonesia</label>
-                                <textarea id="preprocess-bert-input" class="form-textarea h-32" placeholder="Contoh: 'Saya sedang mendengarkan pidato dari bapak Presiden di dpr yang sangat menakjubkan sekali!'"></textarea>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="panel-title font-bold">
+                                    <i data-lucide="layers" class="inline-block w-4 h-4 mr-2 text-purple"></i>IndoBERT Transformer
+                                </h3>
+                                <span class="pipeline-badge pipeline-badge-bert">WordPiece Tokenizer</span>
                             </div>
-                            <button id="btn-run-preprocess-bert" class="btn btn-primary w-full"><i data-lucide="play" class="inline w-4 h-4 mr-2"></i>Jalankan Preprocessing BERT</button>
-                        </div>
-
-                        <!-- Step-by-step BERT Output terminal -->
-                        <div class="panel-card col-span-2">
-                            <h3 class="panel-title mb-4"><i data-lucide="terminal" class="inline-block w-4 h-4 mr-2 text-purple"></i>Output Terminal Preprocessing BERT</h3>
                             
                             <div class="terminal-container">
                                 <div class="terminal-step" id="bert-step-0">
                                     <span class="terminal-number">0</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">INPUT RAW TEXT (TEKS MENTAH):</span>
+                                        <div class="terminal-label">
+                                            <span>INPUT RAW:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('bert-0')" title="Penjelasan Tahap 0 BERT: Input Raw">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text" id="bert-term-raw">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="bert-step-1">
                                     <span class="terminal-number">1</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">TEXT MINIMAL PREPROCESSING (CASE FOLDING, NOISE REMOVAL & SLANG NORMALIZATION):</span>
+                                        <div class="terminal-label">
+                                            <span>NORMALISASI & SLANG:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('bert-1')" title="Penjelasan Tahap 1 BERT: Minimal Preprocessing">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <p class="terminal-text text-pink" id="bert-term-normalized">-</p>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="bert-step-2">
                                     <span class="terminal-number">2</span>
-                                    <div class="terminal-content bg-soft-pink text-dark border-pink">
-                                        <span class="terminal-label">FINAL PREPROCESSED TEXT:</span>
-                                        <p class="terminal-text font-bold" id="bert-term-processed">-</p>
+                                    <div class="terminal-content">
+                                        <div class="terminal-label">
+                                            <span class="text-dark font-bold">HASIL PREPROCESSING:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('bert-2')" title="Penjelasan Tahap 2 BERT: Final Text">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
+                                        <div class="terminal-result-box">
+                                            <p class="terminal-text font-bold" id="bert-term-processed">-</p>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="bert-step-3" style="display: none;">
                                     <span class="terminal-number">3</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">WORDPIECE SUBWORD TOKENS:</span>
+                                        <div class="terminal-label">
+                                            <span>WORDPIECE SUBWORDS:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('bert-3')" title="Penjelasan Tahap 3 BERT: WordPiece Subwords">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <div class="flex flex-wrap gap-2 mt-2" id="bert-term-tokens" style="margin-top: 8px;"></div>
                                     </div>
                                 </div>
                                 <div class="terminal-step" id="bert-step-4" style="display: none;">
                                     <span class="terminal-number">4</span>
                                     <div class="terminal-content">
-                                        <span class="terminal-label">TENSOR ENCODING (TOKEN IDS & ATTENTION MASK):</span>
+                                        <div class="terminal-label">
+                                            <span>TENSOR & ATTENTION MASK:</span>
+                                            <button type="button" class="step-info-btn" onclick="showPreprocessStepInfo('bert-4')" title="Penjelasan Tahap 4 BERT: Tensor & Attention Mask">
+                                                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
                                         <div class="overflow-x-auto mt-2" style="margin-top: 8px;">
-                                            <table class="table-premium w-full text-sm text-left" style="width: 100%; border-collapse: collapse;">
+                                            <table class="table-premium table-to-card w-full text-sm text-left" style="width: 100%; border-collapse: collapse;">
                                                 <thead>
-                                                    <tr style="border-b: 1px solid var(--border-color); text-align: left;">
-                                                        <th style="padding: 6px 12px; font-weight: 600;">Index</th>
-                                                        <th style="padding: 6px 12px; font-weight: 600;">Subword Token</th>
-                                                        <th style="padding: 6px 12px; font-weight: 600; text-align: right;">Token ID</th>
-                                                        <th style="padding: 6px 12px; font-weight: 600; text-align: center;">Attention Mask</th>
+                                                    <tr style="border-bottom: 1px solid rgba(255, 123, 167, 0.2); background: var(--soft-pink); text-align: left;">
+                                                        <th style="padding: 6px 12px; font-weight: 600; color: var(--text-dark);">Index</th>
+                                                        <th style="padding: 6px 12px; font-weight: 600; color: var(--text-dark);">Subword Token</th>
+                                                        <th style="padding: 6px 12px; font-weight: 600; text-align: right; color: var(--text-dark);">Token ID</th>
+                                                        <th style="padding: 6px 12px; font-weight: 600; text-align: center; color: var(--text-dark);">Attention Mask</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="bert-term-table-body">
@@ -388,7 +505,7 @@
                                         </div>
                                         <div class="mt-3" style="margin-top: 12px;">
                                             <span class="terminal-label text-xs">PADDED INPUT TENSOR (MAX_LENGTH = 32):</span>
-                                            <p class="terminal-text text-xs p-2 rounded mt-1 font-mono" id="bert-term-tensor-ids" style="background-color: rgba(15, 10, 15, 0.45); padding: 8px; border-radius: 6px; font-family: monospace; color: #d53f8c; margin-top: 4px; overflow-wrap: break-word; font-size: 11px;">-</p>
+                                            <p class="terminal-text text-xs p-2 rounded mt-1 font-mono" id="bert-term-tensor-ids" style="background-color: var(--warm-gray); border: 1px solid rgba(210,145,188,0.3); padding: 8px; border-radius: 6px; font-family: monospace; color: var(--dusty-purple); margin-top: 4px; overflow-wrap: break-word; font-size: 0.75rem;">-</p>
                                         </div>
                                     </div>
                                 </div>
@@ -399,7 +516,7 @@
 
                 <!-- 4. MODEL TRAINING VIEW -->
                 <section id="view-training" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                    <div class="training-grid">
                         <!-- Setup Form -->
                         <div class="panel-card">
                             <h3 class="panel-title mb-4"><i data-lucide="plus-circle" class="inline-block w-4 h-4 mr-2 text-pink"></i>Konfigurasi Eksperimen</h3>
@@ -418,14 +535,14 @@
                                 <!-- Split Dataset Configuration Options -->
                                 <div class="form-group mb-3">
                                     <label class="form-label mb-1 block">Metode Pemisahan Dataset</label>
-                                    <div class="flex gap-4 my-2">
-                                        <label class="inline-flex items-center cursor-pointer text-sm text-plum-purple">
-                                            <input type="radio" name="split-method" value="dynamic" class="mr-2 accent-pink" checked>
-                                            Split Dinamis (Otomatis)
+                                    <div class="split-radio-group my-2">
+                                        <label class="split-radio-item">
+                                            <input type="radio" name="split-method" value="dynamic" class="accent-pink" checked>
+                                            <span>Split Dinamis (Otomatis)</span>
                                         </label>
-                                        <label class="inline-flex items-center cursor-pointer text-sm text-plum-purple">
-                                            <input type="radio" name="split-method" value="external" class="mr-2 accent-pink">
-                                            Dataset Eksternal
+                                        <label class="split-radio-item">
+                                            <input type="radio" name="split-method" value="external" class="accent-pink">
+                                            <span>Dataset Eksternal</span>
                                         </label>
                                     </div>
                                 </div>
@@ -524,7 +641,7 @@
                         </div>
 
                         <!-- Active Job Progress & Live console log -->
-                        <div class="panel-card col-span-2 flex flex-col h-[520px]">
+                        <div class="panel-card flex flex-col min-h-[520px]">
                             <h3 class="panel-title mb-3"><i data-lucide="play-circle" class="inline-block w-4 h-4 mr-2 text-pink"></i>Status Pelatihan & Log Konsol</h3>
                             
                             <!-- No Job Running State -->
@@ -551,12 +668,12 @@
 
                                 <!-- Console Logs Terminal container -->
                                 <div class="console-log-header flex justify-between items-center mb-1 text-xs font-bold text-rose-mauve tracking-wider uppercase">
-                                    <span>Training Console Logs</span>
+                                    <span>Log Konsol Pelatihan</span>
                                     <span id="active-job-time">Time: 0s</span>
                                 </div>
                                 <div class="console-terminal flex-grow" id="console-terminal">
                                     <!-- Log lines loaded via AJAX -->
-                                    <p class="console-line text-rose-mauve">// Konsol siap menerima logs...</p>
+                                    <p class="console-line text-rose-mauve">// Konsol siap menerima log...</p>
                                 </div>
                             </div>
                         </div>
@@ -566,17 +683,17 @@
                     <div class="panel-card mt-6">
                         <h3 class="panel-title mb-4"><i data-lucide="history" class="inline-block w-4 h-4 mr-2 text-pink"></i>Riwayat Eksekusi Pekerjaan</h3>
                         <div class="table-container">
-                            <table class="table" id="table-jobs">
+                            <table class="table table-to-card" id="table-jobs">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
                                         <th>Eksperimen</th>
                                         <th>Dataset</th>
                                         <th>Model</th>
-                                        <th>Waktu Latih</th>
-                                        <th>Progress</th>
+                                        <th>Durasi Latih</th>
+                                        <th>Progres</th>
                                         <th>Status</th>
-                                        <th>Mulai Pada</th>
+                                        <th>Waktu Mulai</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -590,19 +707,20 @@
 
                 <!-- 5. EVALUATION LAB VIEW -->
                 <section id="view-evaluations" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                    <div class="evaluations-grid">
                         <!-- Left: Model comparisons selector / rank table -->
-                        <div class="panel-card col-span-2">
+                        <div class="panel-card">
                             <h3 class="panel-title mb-4"><i data-lucide="award" class="inline-block w-4 h-4 mr-2 text-pink"></i>Papan Peringkat Akurasi Model</h3>
                             <div class="table-container">
-                                <table class="table" id="table-rankings">
+                                <table class="table table-to-card" id="table-rankings">
                                     <thead>
                                         <tr>
+                                            <th style="width: 60px; text-align: center;">Peringkat</th>
                                             <th>ID</th>
                                             <th>Nama Eksperimen</th>
                                             <th>Model</th>
                                             <th>Akurasi</th>
-                                            <th>Precision</th>
+                                            <th>Presisi</th>
                                             <th>Recall</th>
                                             <th>Macro F1</th>
                                             <th>Aksi</th>
@@ -617,13 +735,13 @@
                         </div>
 
                         <!-- Right: Selected model evaluations panel -->
-                        <div class="panel-card">
-                            <h3 class="panel-title mb-4"><i data-lucide="zoom-in" class="inline-block w-4 h-4 mr-2 text-pink"></i>Evaluasi Model Detil</h3>
+                        <div class="panel-card flex flex-col" id="detail-eval-panel-card">
+                            <h3 class="panel-title mb-4"><i data-lucide="zoom-in" class="inline-block w-4 h-4 mr-2 text-pink"></i>Detail Evaluasi Model</h3>
                             
                             <!-- Unselected State -->
-                            <div id="no-eval-selected" class="text-center py-12 text-rose-mauve">
-                                <i data-lucide="eye" class="w-12 h-12 text-pink mb-2"></i>
-                                <p class="font-semibold text-sm">Pilih model di tabel samping</p>
+                            <div id="no-eval-selected" class="flex-grow flex flex-col items-center justify-center text-center py-12 text-rose-mauve my-auto">
+                                <i data-lucide="eye" class="w-12 h-12 text-pink mb-3"></i>
+                                <p class="font-semibold text-sm mb-1">Pilih model di tabel samping</p>
                                 <p class="text-xs">Klik 'Inspeksi' pada baris model yang diinginkan.</p>
                             </div>
 
@@ -652,7 +770,7 @@
 
                                 <h4 class="text-xs font-bold text-rose-mauve tracking-wider uppercase mt-6 mb-2">Classification Report</h4>
                                 <div class="overflow-x-auto rounded-xl border border-warm-gray bg-white p-2">
-                                    <table class="table w-full text-xs text-left" id="classification-report-table" style="width: 100%; border-collapse: collapse;">
+                                    <table class="table table-to-card w-full text-xs text-left" id="classification-report-table" style="width: 100%; border-collapse: collapse;">
                                         <thead>
                                             <tr class="bg-soft-pink border-b border-warm-gray text-rose-mauve font-semibold">
                                                 <th class="p-2">Kelas / Metrik</th>
@@ -674,80 +792,126 @@
 
                 <!-- 6. MCNEMAR TEST LAB VIEW -->
                 <section id="view-mcnemar" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                    <div class="mcnemar-grid">
                         <!-- Setup comparison models -->
-                        <div class="panel-card">
-                            <h3 class="panel-title mb-4"><i data-lucide="scale" class="inline-block w-4 h-4 mr-2 text-pink"></i>Konfigurasi Uji Signifikansi</h3>
-                            <form id="form-mcnemar">
-                                <div class="form-group mb-3">
-                                    <label for="mcnemar-model-a" class="form-label">Model Pertama (Model A)</label>
-                                    <select id="mcnemar-model-a" class="form-select" required>
-                                        <option value="">-- Pilih Model A --</option>
-                                    </select>
+                        <div class="panel-card flex flex-col justify-between">
+                            <div>
+                                <h3 class="panel-title mb-4"><i data-lucide="scale" class="inline-block w-4 h-4 mr-2 text-pink"></i>Konfigurasi Uji Signifikansi</h3>
+                                <form id="form-mcnemar">
+                                    <div class="form-group mb-3">
+                                        <label for="mcnemar-model-a" class="form-label">Model Pertama (Model A)</label>
+                                        <select id="mcnemar-model-a" class="form-select" required>
+                                            <option value="">-- Pilih Model A --</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group mb-4">
+                                        <label for="mcnemar-model-b" class="form-label">Model Kedua (Model B)</label>
+                                        <select id="mcnemar-model-b" class="form-select" required>
+                                            <option value="">-- Pilih Model B --</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-full"><i data-lucide="play" class="inline w-4 h-4 mr-2"></i>Bandingkan Model (McNemar)</button>
+                                </form>
+                            </div>
+
+                            <!-- Research Info & Statistical Hypothesis Card -->
+                            <div class="mcnemar-guide-box mt-6 p-4 rounded-xl border border-pink bg-soft-pink">
+                                <div class="mcnemar-guide-header">
+                                    <i data-lucide="info"></i>
+                                    <h4>Panduan Uji Statistik</h4>
                                 </div>
-                                <div class="form-group mb-4">
-                                    <label for="mcnemar-model-b" class="form-label">Model Kedua (Model B)</label>
-                                    <select id="mcnemar-model-b" class="form-select" required>
-                                        <option value="">-- Pilih Model B --</option>
-                                    </select>
+                                <div class="mcnemar-guide-list">
+                                    <div class="mcnemar-guide-item">
+                                        <span class="mcnemar-guide-dot"></span>
+                                        <div class="mcnemar-guide-text">
+                                            <strong class="mcnemar-guide-label block">Tingkat Signifikansi (&alpha;)</strong>
+                                            <span class="mcnemar-guide-desc">0.05 (Confidence 95%)</span>
+                                        </div>
+                                    </div>
+                                    <div class="mcnemar-guide-item">
+                                        <span class="mcnemar-guide-dot"></span>
+                                        <div class="mcnemar-guide-text">
+                                            <strong class="mcnemar-guide-label block">H<sub>0</sub> (Nol)</strong>
+                                            <span class="mcnemar-guide-desc">Performa kedua model setara (p &ge; 0.05).</span>
+                                        </div>
+                                    </div>
+                                    <div class="mcnemar-guide-item">
+                                        <span class="mcnemar-guide-dot"></span>
+                                        <div class="mcnemar-guide-text">
+                                            <strong class="mcnemar-guide-label block">H<sub>1</sub> (Alternatif)</strong>
+                                            <span class="mcnemar-guide-desc">Perbedaan signifikan secara statistik (p &lt; 0.05).</span>
+                                        </div>
+                                    </div>
+                                    <div class="mcnemar-guide-item">
+                                        <span class="mcnemar-guide-dot"></span>
+                                        <div class="mcnemar-guide-text">
+                                            <strong class="mcnemar-guide-label block">Fokus Analisis</strong>
+                                            <span class="mcnemar-guide-desc">Sel diskordan n<sub>01</sub> &amp; n<sub>10</sub>.</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-full"><i data-lucide="play" class="inline w-4 h-4 mr-2"></i>Bandingkan Model (McNemar)</button>
-                            </form>
+                            </div>
                         </div>
 
                         <!-- Test Output -->
-                        <div class="panel-card col-span-2">
+                        <div class="panel-card flex flex-col" id="mcnemar-result-panel-card">
                             <h3 class="panel-title mb-4"><i data-lucide="award" class="inline-block w-4 h-4 mr-2 text-pink"></i>Hasil Analisis Signifikansi Statistik</h3>
                             
                             <!-- No Test State -->
-                            <div id="no-mcnemar-state" class="text-center py-12 text-rose-mauve">
-                                <i data-lucide="git-compare" class="w-12 h-12 text-pink mb-2 animate-pulse"></i>
-                                <p class="font-semibold text-sm">Pilih dua model berbeda dan jalankan McNemar Test.</p>
+                            <div id="no-mcnemar-state" class="flex-grow flex flex-col items-center justify-center text-center py-12 text-rose-mauve my-auto">
+                                <i data-lucide="git-compare" class="w-12 h-12 text-pink mb-3 animate-pulse"></i>
+                                <p class="font-semibold text-sm mb-1">Pilih dua model berbeda dan jalankan McNemar Test.</p>
                                 <p class="text-xs">Uji ini mengukur apakah perbedaan performa kedua model signifikan atau hanya kebetulan.</p>
                             </div>
 
                             <!-- Finished State -->
                             <div id="mcnemar-result-state" class="hidden">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
                                     
-                                    <!-- Matrix -->
-                                    <div>
-                                        <h4 class="text-sm font-semibold mb-3">Contingency Matrix (Tabel Kontingensi)</h4>
-                                        <table class="mcnemar-table table border">
-                                            <thead>
-                                                <tr>
-                                                    <th></th>
-                                                    <th class="bg-warm-gray">Model B Benar</th>
-                                                    <th class="bg-warm-gray">Model B Salah</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <th class="bg-warm-gray">Model A Benar</th>
-                                                    <td id="mc-n00" class="text-center font-bold text-dark">-</td>
-                                                    <td id="mc-n01" class="text-center font-bold text-pink bg-soft-pink">-</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="bg-warm-gray">Model A Salah</th>
-                                                    <td id="mc-n10" class="text-center font-bold text-purple bg-blush">-</td>
-                                                    <td id="mc-n11" class="text-center font-bold text-dark">-</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                        <p class="text-xs text-rose-mauve mt-2">Sel merah muda & ungu (n01 & n10) mengukur tingkat perselisihan model.</p>
+                                    <!-- Matrix Card -->
+                                    <div class="mcnemar-matrix-card bg-white p-3 sm:p-4 rounded-2xl border border-pink/20 shadow-sm w-full box-border">
+                                        <h4 class="mcnemar-matrix-title font-bold text-rose-mauve uppercase">Contingency Matrix (Tabel Kontingensi)</h4>
+                                        <div class="w-full overflow-hidden">
+                                            <table class="mcnemar-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="mc-corner-cell"></th>
+                                                        <th class="mc-head-col">Model B Benar</th>
+                                                        <th class="mc-head-col">Model B Salah</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <th class="mc-head-row">Model A Benar</th>
+                                                        <td id="mc-n00" class="mc-cell mc-cell-diag">-</td>
+                                                        <td id="mc-n01" class="mc-cell mc-cell-discord-pink">-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th class="mc-head-row">Model A Salah</th>
+                                                        <td id="mc-n10" class="mc-cell mc-cell-discord-purple">-</td>
+                                                        <td id="mc-n11" class="mc-cell mc-cell-diag">-</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <p class="mcnemar-matrix-hint text-rose-mauve leading-relaxed">Sel warna (n<sub>01</sub> &amp; n<sub>10</sub>) mengukur tingkat perselisihan klasifikasi model.</p>
                                     </div>
 
                                     <!-- Explanation panel -->
-                                    <div class="flex flex-col justify-between">
-                                        <div class="mcnemar-status-card text-center p-4 rounded-xl mb-4" id="mc-sig-card">
+                                    <div class="flex flex-col justify-between gap-3 w-full box-border">
+                                        <div class="mcnemar-status-card text-center p-4 rounded-2xl" id="mc-sig-card">
                                             <span class="text-xs font-bold text-rose-mauve uppercase tracking-wider block mb-1">P-Value McNemar Test</span>
-                                            <h2 class="text-3xl font-bold" id="mc-p-value">0.0000</h2>
-                                            <span class="text-sm font-semibold mt-1 block" id="mc-conclusion">Sangat Signifikan (p &lt; 0.05)</span>
+                                            <h2 class="font-bold text-pink font-mono my-1" id="mc-p-value" style="font-size: clamp(1.35rem, 4vw, 1.85rem); line-height: 1.2;">0.0000</h2>
+                                            <div id="mc-p-subtext" class="text-xs font-mono text-rose-mauve mb-2"></div>
+                                            <span class="inline-block px-3 py-1 rounded-full text-xs font-bold" id="mc-conclusion">Sangat Signifikan (p &lt; 0.05)</span>
                                         </div>
 
-                                        <div class="bg-warm-gray p-4 rounded-xl text-xs">
-                                            <h5 class="font-bold text-dark mb-1">Penjelasan Riset:</h5>
-                                            <p class="text-rose-mauve" id="mc-explanation-text">
+                                        <div class="mcnemar-explanation-box text-xs">
+                                            <h5 class="font-bold text-dark mb-2 flex items-center gap-2">
+                                                <i data-lucide="sparkles" class="inline-block w-4 h-4 text-pink flex-shrink-0"></i>
+                                                <span>Interpretasi Riset Ilmiah:</span>
+                                            </h5>
+                                            <p class="text-rose-mauve leading-relaxed" id="mc-explanation-text">
                                                 Kedua model memiliki perbedaan tingkat ketepatan klasifikasi teks yang bermakna secara statistik. Hipotesis nol (H0) yang menyatakan bahwa performa kedua model setara ditolak.
                                             </p>
                                         </div>
@@ -761,26 +925,26 @@
 
                 <!-- 7. PREDICTION LAB VIEW -->
                 <section id="view-prediction" class="view-section hidden">
-                    <div class="dashboard-panels-grid">
+                    <div class="prediction-grid">
                         <!-- Single Pred -->
-                        <div class="panel-card col-span-2">
-                            <h3 class="panel-title mb-4"><i data-lucide="text-cursor-input" class="inline-block w-4 h-4 mr-2 text-pink"></i>Single Text Inference (Prediksi Kalimat Tunggal)</h3>
+                        <div class="panel-card">
+                            <h3 class="panel-title mb-4"><i data-lucide="text-cursor-input" class="inline-block w-4 h-4 mr-2 text-pink"></i>Prediksi Teks Tunggal</h3>
                             <div class="form-group mb-3">
-                                <label for="pred-model" class="form-label">Pilih Model Terlatih (Model Aktif)</label>
+                                <label for="pred-model" class="form-label">Pilih Model Terlatih</label>
                                 <select id="pred-model" class="form-select">
                                     <!-- Dynamic Completed Models -->
                                 </select>
                             </div>
                             <div class="form-group mb-4">
                                 <label for="pred-input-text" class="form-label">Kalimat Prediksi</label>
-                                <textarea id="pred-input-text" class="form-textarea h-24" placeholder="Masukkan kalimat yang ingin Anda prediksi kelasnya di sini..."></textarea>
+                                <textarea id="pred-input-text" class="form-textarea" rows="4" placeholder="Masukkan kalimat yang ingin Anda prediksi kelasnya di sini..."></textarea>
                             </div>
                             <button id="btn-run-prediction" class="btn btn-primary w-full"><i data-lucide="wand2" class="inline w-4 h-4 mr-2"></i>Prediksi Teks</button>
                             
                             <!-- Prediction output container -->
                             <div id="pred-output-container" class="hidden mt-6 bg-soft-pink border border-pink p-4 rounded-xl">
                                 <div class="flex items-center justify-between mb-3 border-b border-pink pb-2">
-                                    <span class="text-xs font-bold text-rose-mauve uppercase tracking-wider">Hasil Prediksi NLP Lab</span>
+                                    <span class="text-xs font-bold text-rose-mauve uppercase tracking-wider">Hasil Prediksi</span>
                                     <span class="text-xs font-bold text-purple" id="pred-time">Inference Completed</span>
                                 </div>
                                 <div class="flex items-center justify-between">
@@ -802,7 +966,7 @@
 
                         <!-- Batch Pred -->
                         <div class="panel-card">
-                            <h3 class="panel-title mb-4"><i data-lucide="file-text" class="inline-block w-4 h-4 mr-2 text-pink"></i>Batch Prediction (Bulk CSV)</h3>
+                            <h3 class="panel-title mb-4"><i data-lucide="file-text" class="inline-block w-4 h-4 mr-2 text-pink"></i>Prediksi Batch CSV</h3>
                             <div class="form-group mb-3">
                                 <label for="batch-pred-model" class="form-label">Pilih Model Terlatih</label>
                                 <select id="batch-pred-model" class="form-select">
@@ -810,9 +974,13 @@
                                 </select>
                             </div>
                             <div class="form-group mb-4">
-                                <label for="batch-file-input" class="form-label">Unggah Berkas CSV</label>
-                                <input type="file" id="batch-file-input" class="form-input" accept=".csv">
-                                <p class="text-xs text-rose-mauve mt-1">CSV harus memiliki kolom 'text'.</p>
+                                <label class="form-label">Unggah Berkas CSV</label>
+                                <div class="upload-dropzone batch-upload-dropzone" id="batch-dropzone" onclick="document.getElementById('batch-file-input').click()">
+                                    <input type="file" id="batch-file-input" class="hidden" accept=".csv">
+                                    <i data-lucide="file-spreadsheet" class="w-8 h-8 text-pink mb-1.5 inline-block"></i>
+                                    <p class="text-xs font-semibold text-dark mb-0.5" id="batch-dropzone-label">Tarik & lepas file CSV di sini atau <span class="text-pink underline cursor-pointer">Pilih File</span></p>
+                                    <p class="text-2xs text-rose-mauve" id="batch-dropzone-sub">Wajib memiliki kolom 'text' (Maks. 10MB)</p>
+                                </div>
                             </div>
                             <button id="btn-batch-prediction" class="btn btn-primary w-full"><i data-lucide="file-output" class="inline w-4 h-4 mr-2"></i>Mulai Batch Prediksi</button>
                             
@@ -832,7 +1000,7 @@
                     <div class="panel-card">
                         <h3 class="panel-title mb-4"><i data-lucide="archive" class="inline-block w-4 h-4 mr-2 text-pink"></i>Model Lifecycle Registry</h3>
                         <div class="table-container">
-                            <table class="table" id="table-registry">
+                            <table class="table table-to-card" id="table-registry">
                                 <thead>
                                     <tr>
                                         <th>Job ID</th>
@@ -856,7 +1024,7 @@
                 <!-- 9. USER PROFILE VIEW -->
                 <section id="view-profile" class="view-section hidden">
                     <div class="profile-container">
-                        <!-- Left Column: Overview -->
+                        <!-- Column 1: Overview -->
                         <div class="profile-sidebar-card">
                             <div class="avatar-container-large" id="avatar-uploader-container">
                                 <img id="profile-display-avatar" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=256" alt="User Profile Image" class="profile-avatar-large">
@@ -869,96 +1037,93 @@
                             </div>
                             <h3 id="profile-sidebar-name">Administrator</h3>
                             <p id="profile-sidebar-role" class="profile-role">Administrator</p>
-                            <div id="profile-sidebar-institution" class="profile-institution-text">Universitas Muhammadiyah Malang</div>
+                            <div id="profile-sidebar-institution" class="profile-institution-text">Universitas Muhammadiyah Sumatera Utara</div>
                         </div>
 
-                        <!-- Right Column: Edit Forms -->
-                        <div class="profile-settings-grid">
-                            <!-- Section 1: Basic Info -->
-                            <div class="profile-form-card">
-                                <h2><i data-lucide="settings" class="inline-block w-4 h-4 mr-1"></i> Pengaturan Informasi Profil</h2>
-                                <form id="form-profile-info">
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 16px;">
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-name">Nama Lengkap</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-name" name="name" type="text" class="input-premium-with-icon" placeholder="Masukkan nama lengkap" required>
-                                                <i data-lucide="user" class="input-icon-left w-4 h-4"></i>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-email">Alamat Email</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-email" name="email" type="email" class="input-premium-with-icon" placeholder="nama@email.com" required>
-                                                <i data-lucide="mail" class="input-icon-left w-4 h-4"></i>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-institution">Institusi</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-institution" name="institution" type="text" class="input-premium-with-icon" placeholder="Nama Institusi / Universitas" required>
-                                                <i data-lucide="building-2" class="input-icon-left w-4 h-4"></i>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-role">Peran / Jabatan</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-role" name="role" type="text" class="input-premium-with-icon" placeholder="Peran" required>
-                                                <i data-lucide="briefcase" class="input-icon-left w-4 h-4"></i>
-                                            </div>
+                        <!-- Column 2: Edit Profile Info -->
+                        <div class="profile-form-card">
+                            <h2><i data-lucide="settings" class="inline-block w-4 h-4 mr-1"></i> Pengaturan Informasi Profil</h2>
+                            <form id="form-profile-info">
+                                <div class="grid grid-cols-1 gap-4 mb-4">
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-name">Nama Lengkap</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-name" name="name" type="text" class="input-premium-with-icon" placeholder="Masukkan nama lengkap" required>
+                                            <i data-lucide="user" class="input-icon-left w-4 h-4"></i>
                                         </div>
                                     </div>
-                                    <div class="flex justify-end mt-4">
-                                        <button type="submit" class="btn-premium">
-                                            <i data-lucide="save" class="inline-block mr-2 w-4 h-4"></i> Simpan Profil
-                                        </button>
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-email">Alamat Email</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-email" name="email" type="email" class="input-premium-with-icon" placeholder="nama@email.com" required>
+                                            <i data-lucide="mail" class="input-icon-left w-4 h-4"></i>
+                                        </div>
                                     </div>
-                                </form>
-                            </div>
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-institution">Institusi</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-institution" name="institution" type="text" class="input-premium-with-icon" placeholder="Nama Institusi / Universitas" required>
+                                            <i data-lucide="building-2" class="input-icon-left w-4 h-4"></i>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-role">Peran / Jabatan</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-role" name="role" type="text" class="input-premium-with-icon" placeholder="Peran" required>
+                                            <i data-lucide="briefcase" class="input-icon-left w-4 h-4"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end mt-4">
+                                    <button type="submit" class="btn-premium w-full">
+                                        <i data-lucide="save" class="inline-block mr-2 w-4 h-4"></i> Simpan Profil
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
 
-                            <!-- Section 2: Change Password -->
-                            <div class="profile-form-card">
-                                <h2><i data-lucide="key-round" class="inline-block w-4 h-4 mr-1"></i> Perbarui Kata Sandi</h2>
-                                <form id="form-change-password">
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-old-password">Kata Sandi Saat Ini</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-old-password" name="current_password" type="password" class="input-premium-with-icon" placeholder="••••••••" required>
-                                                <i data-lucide="lock" class="input-icon-left w-4 h-4"></i>
-                                                <button type="button" id="btn-toggle-old-password" class="password-toggle-btn" title="Tampilkan sandi">
-                                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-new-password">Kata Sandi Baru</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-new-password" name="new_password" type="password" class="input-premium-with-icon" placeholder="Minimal 6 karakter" required>
-                                                <i data-lucide="key" class="input-icon-left w-4 h-4"></i>
-                                                <button type="button" id="btn-toggle-new-password" class="password-toggle-btn" title="Tampilkan sandi">
-                                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label-premium mb-2 block" for="profile-input-confirm-password">Konfirmasi Sandi Baru</label>
-                                            <div class="input-group-premium">
-                                                <input id="profile-input-confirm-password" name="confirm_password" type="password" class="input-premium-with-icon" placeholder="Ulangi sandi baru" required>
-                                                <i data-lucide="shield-check" class="input-icon-left w-4 h-4"></i>
-                                                <button type="button" id="btn-toggle-confirm-password" class="password-toggle-btn" title="Tampilkan sandi">
-                                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                                </button>
-                                            </div>
+                        <!-- Column 3: Change Password -->
+                        <div class="profile-form-card">
+                            <h2><i data-lucide="key-round" class="inline-block w-4 h-4 mr-1"></i> Perbarui Kata Sandi</h2>
+                            <form id="form-change-password">
+                                <div class="grid grid-cols-1 gap-4 mb-4">
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-old-password">Kata Sandi Saat Ini</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-old-password" name="current_password" type="password" class="input-premium-with-icon" placeholder="••••••••" required>
+                                            <i data-lucide="lock" class="input-icon-left w-4 h-4"></i>
+                                            <button type="button" id="btn-toggle-old-password" class="password-toggle-btn" title="Tampilkan sandi">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="flex justify-end mt-4">
-                                        <button type="submit" class="btn-premium">
-                                            <i data-lucide="key" class="inline-block mr-2 w-4 h-4"></i> Ubah Kata Sandi
-                                        </button>
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-new-password">Kata Sandi Baru</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-new-password" name="new_password" type="password" class="input-premium-with-icon" placeholder="Minimal 6 karakter" required>
+                                            <i data-lucide="key" class="input-icon-left w-4 h-4"></i>
+                                            <button type="button" id="btn-toggle-new-password" class="password-toggle-btn" title="Tampilkan sandi">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
                                     </div>
-                                </form>
-                            </div>
+                                    <div class="form-group">
+                                        <label class="form-label-premium block" for="profile-input-confirm-password">Konfirmasi Sandi Baru</label>
+                                        <div class="input-group-premium">
+                                            <input id="profile-input-confirm-password" name="confirm_password" type="password" class="input-premium-with-icon" placeholder="Ulangi sandi baru" required>
+                                            <i data-lucide="shield-check" class="input-icon-left w-4 h-4"></i>
+                                            <button type="button" id="btn-toggle-confirm-password" class="password-toggle-btn" title="Tampilkan sandi">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end mt-4">
+                                    <button type="submit" class="btn-premium w-full">
+                                        <i data-lucide="key" class="inline-block mr-2 w-4 h-4"></i> Ubah Kata Sandi
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </section>
@@ -977,11 +1142,10 @@
         </div>
 
         <div class="login-box card-hover">
-            <div class="login-header text-center mb-8">
-                <div class="brand-logo-glow mb-3 mx-auto">
-                    <i data-lucide="flower" class="text-pink w-6 h-6"></i>
+            <div class="login-header text-center mb-6">
+                <div class="login-logo-wrapper mb-2 mx-auto flex items-center justify-center">
+                    <img src="/static/img/logo.png?v=75.0" alt="Ummu NLP Lab" class="login-brand-logo mx-auto">
                 </div>
-                <h2 class="text-2xl font-bold tracking-tight bg-gradient-brand text-transparent bg-clip-text">Ummu NLP Lab</h2>
                 <p class="text-xs text-rose-mauve font-medium mt-1 leading-relaxed">Platform Penelitian Klasifikasi Teks Bahasa Indonesia</p>
             </div>
             
@@ -1014,7 +1178,7 @@
     </div>
 
     <!-- 3. CUSTOM CONFIRM MODAL (GLASSMORPHISM) -->
-    <div id="confirm-modal" class="confirm-modal-overlay hidden">
+    <div id="confirm-modal" class="confirm-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="confirm-modal-box">
             <div class="confirm-modal-header">
                 <div class="confirm-modal-icon-bg">
@@ -1031,6 +1195,156 @@
             <div class="confirm-modal-footer">
                 <button id="confirm-btn-cancel" class="btn btn-modal-secondary">Batal</button>
                 <button id="confirm-btn-ok" class="btn btn-danger">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. PREPROCESSING DETAIL EXPLANATION MODAL -->
+    <div id="preprocess-info-modal" class="confirm-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="info-modal-title" style="z-index: 3000;">
+        <div class="info-modal-box">
+            <div class="info-modal-header">
+                <div class="info-modal-header-left">
+                    <div class="info-modal-icon-badge" id="info-modal-icon-container">
+                        <i id="info-modal-icon" data-lucide="sparkles" class="w-6 h-6"></i>
+                    </div>
+                    <div class="info-modal-header-text">
+                        <h3 id="info-modal-title" class="info-modal-title-text">Penjelasan Tahap Preprocessing</h3>
+                        <p id="info-modal-subtitle" class="info-modal-subtitle-text">Tinjauan Teoretis dan Dampak Model</p>
+                    </div>
+                </div>
+                <button type="button" class="info-modal-close-btn" onclick="closePreprocessInfoModal()" aria-label="Tutup dialog" title="Tutup">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div id="info-modal-body" class="text-xs text-dark space-y-3 leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+                <!-- Dynamic rich explanation content will be rendered here -->
+            </div>
+            
+            <div class="info-modal-footer">
+                <button type="button" class="btn-modal-action" onclick="closePreprocessInfoModal()">
+                    <i data-lucide="check-circle" class="w-4 h-4 mr-1 inline"></i>Mengerti, Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 5. PWA APP INSTALL PROMPT MODAL (MINIMALIST GLASSMORPHISM) -->
+    <div id="pwa-install-modal" class="confirm-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title" style="z-index: 3000;">
+        <div class="pwa-install-modal-box pwa-minimalist">
+            <button type="button" class="pwa-modal-close-btn" onclick="hidePwaInstallModal(false)" aria-label="Tutup dialog" title="Tutup">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <div class="pwa-modal-hero">
+                <div class="pwa-modal-icon-badge">
+                    <img src="/static/img/favicon-64.png?v=75.0" alt="Ummu NLP Lab" class="pwa-modal-app-icon">
+                </div>
+                <h3 id="pwa-install-title" class="pwa-modal-title">Install Aplikasi NLP Lab</h3>
+                <p class="pwa-modal-subtitle">Pasang di perangkat Anda untuk akses instan satu sentuhan dan pengalaman standalone terbaik.</p>
+            </div>
+
+            <div class="pwa-modal-actions">
+                <button type="button" class="btn btn-modal-secondary pwa-btn-dismiss" onclick="hidePwaInstallModal(true)">
+                    Nanti Saja
+                </button>
+                <button type="button" class="btn btn-primary pwa-btn-install" id="btn-pwa-install-action" onclick="triggerPwaInstall()">
+                    <i data-lucide="download" class="w-4 h-4 mr-1.5 inline"></i>Install Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE FLOATING BOTTOM NAVIGATION BAR (iOS / Android Native Feel) -->
+    <nav id="mobile-bottom-nav" class="mobile-bottom-bar md:hidden" role="navigation" aria-label="Navigasi Mobile">
+        <a href="/dashboard" class="mobile-nav-item active" id="mob-nav-dashboard">
+            <div class="mobile-nav-icon"><i data-lucide="layout-dashboard"></i></div>
+            <span class="mobile-nav-label">Dashboard</span>
+        </a>
+        <a href="/preprocess" class="mobile-nav-item" id="mob-nav-preprocess">
+            <div class="mobile-nav-icon"><i data-lucide="terminal"></i></div>
+            <span class="mobile-nav-label">Preprocess</span>
+        </a>
+        <a href="/training" class="mobile-nav-item" id="mob-nav-training">
+            <div class="mobile-nav-icon"><i data-lucide="cpu"></i></div>
+            <span class="mobile-nav-label">Training</span>
+        </a>
+        <a href="/evaluations" class="mobile-nav-item" id="mob-nav-evaluations">
+            <div class="mobile-nav-icon"><i data-lucide="award"></i></div>
+            <span class="mobile-nav-label">Evaluasi</span>
+        </a>
+        <button type="button" class="mobile-nav-item" id="mob-nav-more" onclick="toggleMobileMoreDrawer()">
+            <div class="mobile-nav-icon"><i data-lucide="grid"></i></div>
+            <span class="mobile-nav-label">Menu</span>
+        </button>
+    </nav>
+
+    <!-- MOBILE MORE DRAWER SHEET -->
+    <div id="mobile-more-sheet" class="mobile-sheet-overlay md:hidden hidden" onclick="if(event.target===this) toggleMobileMoreDrawer()">
+        <div class="mobile-sheet-content">
+            <div class="mobile-sheet-drag-handle"></div>
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-pink/15">
+                <h3 class="font-bold text-dark text-base flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-soft-pink border border-pink/30 flex items-center justify-center text-pink shadow-xs">
+                        <i data-lucide="grid" class="w-4 h-4"></i>
+                    </span>
+                    <span>Modul Penelitian Lainnya</span>
+                </h3>
+                <button type="button" class="btn-icon w-8 h-8 rounded-full bg-soft-pink/50 hover:bg-soft-pink flex items-center justify-center text-rose-mauve transition-colors" onclick="toggleMobileMoreDrawer()">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-sheet-grid">
+                <a href="/datasets" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer()">
+                    <div class="sheet-card-icon sheet-icon-pink"><i data-lucide="database"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">Dataset Manager</span>
+                        <span class="sheet-card-sub">Kelola data CSV</span>
+                    </div>
+                </a>
+                <a href="/mcnemar" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer()">
+                    <div class="sheet-card-icon sheet-icon-purple"><i data-lucide="scale"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">McNemar Test</span>
+                        <span class="sheet-card-sub">Uji Signifikansi</span>
+                    </div>
+                </a>
+                <a href="/prediction" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer()">
+                    <div class="sheet-card-icon sheet-icon-purple"><i data-lucide="wand2"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">Prediction Lab</span>
+                        <span class="sheet-card-sub">Inference Sentimen</span>
+                    </div>
+                </a>
+                <a href="/registry" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer()">
+                    <div class="sheet-card-icon sheet-icon-pink"><i data-lucide="archive"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">Model Registry</span>
+                        <span class="sheet-card-sub">Biner Model .pkl</span>
+                    </div>
+                </a>
+                <a href="/profile" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer()">
+                    <div class="sheet-card-icon sheet-icon-pink"><i data-lucide="user"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">Profil Peneliti</span>
+                        <span class="sheet-card-sub">Akun & Pengaturan</span>
+                    </div>
+                </a>
+                <button type="button" class="mobile-sheet-card" onclick="toggleMobileMoreDrawer(); showPwaInstallModal();">
+                    <div class="sheet-card-icon sheet-icon-pink"><i data-lucide="download"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title">Install App (PWA)</span>
+                        <span class="sheet-card-sub">Aplikasi Standalone</span>
+                    </div>
+                </button>
+                <button type="button" class="mobile-sheet-card sheet-card-danger" onclick="toggleMobileMoreDrawer(); document.getElementById('btn-logout').click();">
+                    <div class="sheet-card-icon sheet-icon-danger"><i data-lucide="log-out"></i></div>
+                    <div class="sheet-card-info">
+                        <span class="sheet-card-title text-red">Keluar Lab</span>
+                        <span class="sheet-card-sub">Akhiri sesi</span>
+                    </div>
+                </button>
             </div>
         </div>
     </div>
@@ -1067,7 +1381,7 @@
         });
     </script>
     <!-- Custom JS controllers -->
-    <script src="/static/js/charts.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/charts.js?v=100.0"></script>
+    <script src="/static/js/app.js?v=100.0"></script>
 </body>
 </html>

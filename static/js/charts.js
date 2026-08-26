@@ -31,7 +31,7 @@ function createRadialBarChart(containerId, label, color) {
         series: [0],
         chart: {
             type: 'radialBar',
-            height: 140,
+            height: 125,
             sparkline: { enabled: true }
         },
         plotOptions: {
@@ -41,13 +41,13 @@ function createRadialBarChart(containerId, label, color) {
                 track: {
                     background: PALETTE.gray,
                     strokeWidth: '97%',
-                    margin: 5,
+                    margin: 4,
                 },
                 dataLabels: {
                     name: { show: false },
                     value: {
                         offsetY: -2,
-                        fontSize: '18px',
+                        fontSize: '16px',
                         fontWeight: '700',
                         color: PALETTE.dark,
                         formatter: function (val) {
@@ -58,14 +58,40 @@ function createRadialBarChart(containerId, label, color) {
             }
         },
         fill: {
-            colors: [color]
+            type: 'gradient',
+            gradient: {
+                shade: 'light',
+                type: 'horizontal',
+                shadeIntensity: 0.5,
+                gradientToColors: ['#8E7CC3'],
+                inverseColors: false,
+                opacityFrom: 1,
+                opacityTo: 1,
+                stops: [0, 100]
+            }
         },
         stroke: {
             lineCap: 'round'
-        }
+        },
+        responsive: [{
+            breakpoint: 640,
+            options: {
+                chart: { height: 105 },
+                plotOptions: {
+                    radialBar: {
+                        dataLabels: {
+                            value: { fontSize: '13px', offsetY: -2 }
+                        }
+                    }
+                }
+            }
+        }]
     };
 
-    const chart = new ApexCharts(document.querySelector(containerId), options);
+    const containerEl = document.querySelector(containerId);
+    if (!containerEl) return null;
+
+    const chart = new ApexCharts(containerEl, options);
     chart.render();
     return chart;
 }
@@ -92,12 +118,13 @@ function updateResourceChart(type, percentage) {
 }
 
 /**
- * Renders dataset class distribution donut chart
+/**
+ * Renders dataset class distribution donut chart (Expanded Ring without Legend)
  */
 function renderDatasetDonut(classDist) {
     const labels = Object.keys(classDist).map(l => {
-        // Jika label berupa angka murni, tambahkan prefiks "Kelas " agar lebih profesional
-        return isNaN(l) ? l : "Kelas " + l;
+        const name = isNaN(l) ? l : "Kelas " + l;
+        return name.charAt(0).toUpperCase() + name.slice(1);
     });
     const series = Object.values(classDist);
     
@@ -109,7 +136,7 @@ function renderDatasetDonut(classDist) {
         series: series,
         chart: {
             type: 'donut',
-            height: 250,
+            height: 320,
             fontFamily: 'Outfit',
             animations: {
                 enabled: true,
@@ -129,31 +156,31 @@ function renderDatasetDonut(classDist) {
         colors: [PALETTE.pink, PALETTE.purple, PALETTE.mauve, '#FCA3B7', '#8672C1'],
         stroke: {
             show: true,
-            width: 3,
+            width: 4,
             colors: ['#ffffff']
         },
         plotOptions: {
             pie: {
                 expandOnClick: true,
                 donut: {
-                    size: '72%',
+                    size: '60%',
                     background: 'transparent',
                     labels: {
                         show: true,
                         name: {
                             show: true,
-                            fontSize: '13px',
+                            fontSize: '14px',
                             fontFamily: 'Outfit',
                             fontWeight: 600,
-                            color: '#8E7CC3',
-                            offsetY: -6
+                            color: '#E94F9A',
+                            offsetY: -4
                         },
                         value: {
                             show: true,
                             fontSize: '22px',
                             fontFamily: 'Outfit',
-                            fontWeight: 700,
-                            color: '#333333',
+                            fontWeight: 800,
+                            color: '#2D2230',
                             offsetY: 6,
                             formatter: function (val) {
                                 return Number(val).toLocaleString('id-ID');
@@ -161,11 +188,11 @@ function renderDatasetDonut(classDist) {
                         },
                         total: {
                             show: true,
-                            showAlways: true,
+                            showAlways: false,
                             label: 'Total Data',
-                            fontSize: '12px',
+                            fontSize: '13px',
                             fontFamily: 'Outfit',
-                            fontWeight: 600,
+                            fontWeight: 700,
                             color: '#8E7CC3',
                             formatter: function (w) {
                                 const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
@@ -176,40 +203,35 @@ function renderDatasetDonut(classDist) {
                 }
             }
         },
-        legend: {
-            show: true,
-            position: 'right',
-            horizontalAlign: 'center',
-            verticalAlign: 'middle',
-            fontFamily: 'Outfit',
-            fontSize: '13px',
-            fontWeight: 500,
-            labels: {
-                colors: '#555555'
+        states: {
+            normal: {
+                filter: { type: 'none' }
             },
-            markers: {
-                width: 10,
-                height: 10,
-                radius: 12,
-                offsetX: -4
+            hover: {
+                filter: {
+                    type: 'darken',
+                    value: 0.88
+                }
             },
-            itemMargin: {
-                horizontal: 10,
-                vertical: 6
-            },
-            formatter: function(seriesName, opts) {
-                const val = opts.w.globals.series[opts.seriesIndex];
-                const total = opts.w.globals.seriesTotals.reduce((a, b) => a + b, 0);
-                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
-                return `${seriesName}: <strong>${val}</strong> <span style="color: #888; font-size: 11px;">(${pct}%)</span>`;
+            active: {
+                allowMultipleDataPointsSelection: false,
+                filter: {
+                    type: 'none'
+                }
             }
+        },
+        legend: {
+            show: false
         },
         dataLabels: {
             enabled: true,
+            formatter: function(val) {
+                return val.toFixed(1) + '%';
+            },
             style: {
-                fontSize: '11px',
+                fontSize: '13px',
                 fontFamily: 'Outfit',
-                fontWeight: '600',
+                fontWeight: '700',
                 colors: ['#ffffff']
             },
             background: {
@@ -219,21 +241,27 @@ function renderDatasetDonut(classDist) {
                 enabled: true,
                 top: 1,
                 left: 1,
-                blur: 1,
+                blur: 3,
                 color: '#000000',
-                opacity: 0.15
+                opacity: 0.5
             }
         },
         tooltip: {
             enabled: true,
             theme: 'light',
+            fillSeriesColor: false,
+            shared: false,
+            intersect: true,
+            followCursor: true,
             style: {
-                fontSize: '12px',
+                fontSize: '13px',
                 fontFamily: 'Outfit'
             },
             y: {
-                formatter: function (val) {
-                    return val.toLocaleString('id-ID') + " baris data";
+                formatter: function (val, opts) {
+                    const total = opts.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                    return Number(val).toLocaleString('id-ID') + " baris (" + pct + "%)";
                 }
             }
         },
@@ -242,35 +270,39 @@ function renderDatasetDonut(classDist) {
                 breakpoint: 768,
                 options: {
                     chart: {
-                        height: 320
-                    },
-                    legend: {
-                        position: 'bottom',
-                        offsetX: 0,
-                        offsetY: 0
+                        height: 280
                     }
                 }
             }
         ]
     };
     
-    CHARTS.dataset = new ApexCharts(document.querySelector("#dataset-class-chart"), options);
+    const containerEl = document.querySelector("#dataset-class-chart");
+    if (!containerEl) return;
+
+    CHARTS.dataset = new ApexCharts(containerEl, options);
     CHARTS.dataset.render();
 }
 
 /**
- * Renders model evaluation comparison bar chart
+ * Renders model evaluation comparison horizontal bar chart (Top 10 Models)
  */
 function renderModelComparisons(models) {
     if (!models || models.length === 0) return;
     
-    const names = models.map(m => m.exp_name);
-    const accuracies = models.map(m => m.accuracy * 100);
-    const f1s = models.map(m => m.macro_f1 * 100);
+    // Display Top 10 best performing models
+    const topModels = models.slice(0, 10);
+    
+    const names = topModels.map(m => m.exp_name);
+    const accuracies = topModels.map(m => Number((m.accuracy * 100).toFixed(1)));
+    const f1s = topModels.map(m => Number((m.macro_f1 * 100).toFixed(1)));
     
     if (CHARTS.ranking) {
         CHARTS.ranking.destroy();
     }
+    
+    // Dynamic height based on number of models for optimal spacing
+    const chartHeight = Math.max(300, Math.min(540, topModels.length * 48));
     
     const options = {
         series: [
@@ -279,15 +311,15 @@ function renderModelComparisons(models) {
         ],
         chart: {
             type: 'bar',
-            height: 260,
-            toolbar: { show: false }
+            height: chartHeight,
+            toolbar: { show: false },
+            fontFamily: 'Outfit, sans-serif'
         },
         plotOptions: {
             bar: {
-                horizontal: false,
-                columnWidth: '55%',
-                endingShape: 'rounded',
-                borderRadius: 4
+                horizontal: true,
+                barHeight: '65%',
+                borderRadius: 5
             },
         },
         dataLabels: {
@@ -301,18 +333,41 @@ function renderModelComparisons(models) {
         colors: [PALETTE.pink, PALETTE.purple],
         xaxis: {
             categories: names,
-            labels: { style: { fontFamily: 'Outfit' } }
+            title: {
+                text: 'Performa (%)',
+                style: { fontFamily: 'Outfit', fontSize: '12px', fontWeight: 600, color: '#7A687F' }
+            },
+            max: 100,
+            labels: { 
+                formatter: function (val) {
+                    return Math.round(val) + '%';
+                },
+                style: { 
+                    fontFamily: 'Outfit',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    colors: '#7A687F'
+                } 
+            }
         },
         yaxis: {
-            title: { text: 'Performa (%)', style: { fontFamily: 'Outfit' } },
-            max: 100,
             labels: {
-                formatter: function (val) {
-                    return Math.round(val);
-                },
                 style: {
-                    fontFamily: 'Outfit'
+                    fontFamily: 'Outfit',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    colors: '#2D2230'
                 }
+            }
+        },
+        grid: {
+            borderColor: 'rgba(255, 123, 167, 0.12)',
+            strokeDashArray: 4,
+            xaxis: {
+                lines: { show: true }
+            },
+            yaxis: {
+                lines: { show: false }
             }
         },
         fill: {
@@ -320,18 +375,57 @@ function renderModelComparisons(models) {
         },
         legend: {
             position: 'top',
-            fontFamily: 'Outfit'
+            horizontalAlign: 'center',
+            fontFamily: 'Outfit',
+            fontWeight: 600,
+            fontSize: '12px',
+            markers: {
+                radius: 4
+            }
         },
         tooltip: {
+            enabled: true,
+            theme: 'light',
+            shared: true,
+            intersect: false,
+            style: {
+                fontSize: '12px',
+                fontFamily: 'Outfit'
+            },
             y: {
                 formatter: function (val) {
                     return val.toFixed(2) + " %";
                 }
             }
-        }
+        },
+        responsive: [
+            {
+                breakpoint: 640,
+                options: {
+                    chart: {
+                        height: Math.max(280, Math.min(500, topModels.length * 44))
+                    },
+                    plotOptions: {
+                        bar: {
+                            barHeight: '72%'
+                        }
+                    },
+                    yaxis: {
+                        labels: {
+                            style: {
+                                fontSize: '11px'
+                            }
+                        }
+                    }
+                }
+            }
+        ]
     };
     
-    CHARTS.ranking = new ApexCharts(document.querySelector("#models-bar-chart"), options);
+    const containerEl = document.querySelector("#models-bar-chart");
+    if (!containerEl) return;
+
+    CHARTS.ranking = new ApexCharts(containerEl, options);
     CHARTS.ranking.render();
 }
 
@@ -364,12 +458,25 @@ function renderPredictionProbabilities(probMap) {
             }
         },
         colors: [PALETTE.pink],
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shade: 'light',
+                type: 'horizontal',
+                shadeIntensity: 0.5,
+                gradientToColors: ['#8E7CC3'],
+                inverseColors: false,
+                opacityFrom: 1,
+                opacityTo: 1,
+                stops: [0, 100]
+            }
+        },
         dataLabels: {
             enabled: true,
             formatter: function (val) {
                 return val.toFixed(1) + "%";
             },
-            style: { fontFamily: 'Outfit' }
+            style: { fontSize: '10px', colors: ['#333333'], fontFamily: 'Outfit' }
         },
         xaxis: {
             categories: classes,
@@ -381,6 +488,12 @@ function renderPredictionProbabilities(probMap) {
         },
         grid: { show: false },
         tooltip: {
+            fixed: {
+                enabled: true,
+                position: 'topCenter',
+                offsetX: 0,
+                offsetY: 0
+            },
             y: {
                 formatter: function (val) {
                     return val.toFixed(2) + "%";
@@ -389,6 +502,9 @@ function renderPredictionProbabilities(probMap) {
         }
     };
     
-    CHARTS.prediction = new ApexCharts(document.querySelector("#pred-dist-chart"), options);
+    const predContainerEl = document.querySelector("#pred-dist-chart");
+    if (!predContainerEl) return;
+
+    CHARTS.prediction = new ApexCharts(predContainerEl, options);
     CHARTS.prediction.render();
 }

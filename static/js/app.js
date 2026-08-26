@@ -14,24 +14,50 @@ const STATE = {
     realGpuAvailable: false
 };
 
+function animateCounter(element, targetValue, duration = 800) {
+    if (!element) return;
+    const start = parseInt(element.textContent) || 0;
+    const range = targetValue - start;
+    if (range === 0) { element.textContent = targetValue; return; }
+    const startTime = performance.now();
+    function step(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        element.textContent = Math.round(start + range * eased);
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
 // Toast message trigger helper
+let toastTimeoutId = null;
+
 function showToast(message, isError = false) {
     const toast = document.getElementById('toast');
     const toastMsg = document.getElementById('toast-message');
+    if (!toast || !toastMsg) return;
     
-    toastMsg.textContent = message;
+    if (toastTimeoutId) {
+        clearTimeout(toastTimeoutId);
+        toastTimeoutId = null;
+    }
+    
+    const icon = isError ? '⚠️ ' : '✅ ';
+    toastMsg.textContent = icon + message;
     if (isError) {
-        toast.style.borderLeftColor = 'var(--red)';
+        toast.style.borderLeftColor = '#EF4444';
     } else {
         toast.style.borderLeftColor = 'var(--primary-pink)';
     }
     
     toast.classList.remove('hidden');
     
-    // Auto hide after 3 seconds
-    setTimeout(() => {
+    // Auto hide after 3.2 seconds
+    toastTimeoutId = setTimeout(() => {
         toast.classList.add('hidden');
-    }, 3000);
+        toastTimeoutId = null;
+    }, 3200);
 }
 
 // Global Custom Confirmation Modal Helper
@@ -138,22 +164,49 @@ function showCustomAlert(title, message, submessage = '', okText = 'Tutup') {
     });
 }
 
-// Global loader controllers
-function showLoader() {
-    document.getElementById('global-loader').style.opacity = '1';
-    document.getElementById('global-loader').style.pointerEvents = 'all';
+// In-App Action / Global loader controllers (distinct from Cold Start Splash)
+function showLoader(customMessage = "Memproses Data...") {
+    const loaderEl = document.getElementById('global-loader');
+    if (!loaderEl) return;
+    const textEl = loaderEl.querySelector('.page-loader-text');
+    if (textEl) textEl.textContent = customMessage;
+    loaderEl.style.opacity = '1';
+    loaderEl.style.pointerEvents = 'all';
 }
 
 function hideLoader() {
-    document.getElementById('global-loader').style.opacity = '0';
-    document.getElementById('global-loader').style.pointerEvents = 'none';
+    const loaderEl = document.getElementById('global-loader');
+    if (!loaderEl) return;
+    loaderEl.style.opacity = '0';
+    loaderEl.style.pointerEvents = 'none';
 }
 
 // --- VIEW NAVIGATION / ROUTER ---
 const VIEWS = ['dashboard', 'datasets', 'preprocess', 'preprocess-bert', 'training', 'evaluations', 'mcnemar', 'prediction', 'registry', 'profile'];
 
-function navigateToView(viewId) {
+function getViewFromPath() {
+    const rawPath = window.location.pathname.replace(/^\/+/, '').split('/')[0];
+    const hashFallback = window.location.hash ? window.location.hash.substring(1) : '';
+    const candidate = rawPath || hashFallback;
+    return VIEWS.includes(candidate) ? candidate : 'dashboard';
+}
+
+function navigateToView(viewId, updateHistory = true) {
+    let targetTab = null;
+    if (viewId === 'preprocess-bert') {
+        viewId = 'preprocess';
+        targetTab = 'bert';
+    }
+    
     if (!VIEWS.includes(viewId)) viewId = 'dashboard';
+    
+    // Update URL without hash using HTML5 History API
+    if (updateHistory) {
+        const targetUrl = '/' + (targetTab ? 'preprocess-bert' : viewId);
+        if (window.location.pathname !== targetUrl && (viewId !== 'dashboard' || (window.location.pathname !== '/' && window.location.pathname !== '/dashboard'))) {
+            history.pushState({ view: targetTab ? 'preprocess-bert' : viewId }, '', targetUrl);
+        }
+    }
     
     // Hide all views, deactivate sidebar menu links
     VIEWS.forEach(v => {
@@ -163,9 +216,24 @@ function navigateToView(viewId) {
         if (navEl) navEl.classList.remove('active');
     });
     
+    // Update mobile bottom navigation items
+    const mobileNavIds = ['dashboard', 'preprocess', 'training', 'evaluations'];
+    mobileNavIds.forEach(id => {
+        const el = document.getElementById(`mob-nav-${id}`);
+        if (el) el.classList.toggle('active', id === viewId);
+    });
+    const mobMore = document.getElementById('mob-nav-more');
+    if (mobMore) {
+        mobMore.classList.toggle('active', !mobileNavIds.includes(viewId));
+    }
+    
     // Show active view
     const activeViewEl = document.getElementById(`view-${viewId}`);
-    if (activeViewEl) activeViewEl.classList.remove('hidden');
+    if (activeViewEl) {
+        activeViewEl.classList.remove('hidden');
+        activeViewEl.classList.add('animate-fadeIn');
+        setTimeout(() => activeViewEl.classList.remove('animate-fadeIn'), 400);
+    }
     const activeNavEl = document.getElementById(`nav-${viewId}`);
     if (activeNavEl) activeNavEl.classList.add('active');
     
@@ -173,8 +241,7 @@ function navigateToView(viewId) {
     const viewTitleMap = {
         dashboard: "Dashboard Ringkasan",
         datasets: "Dataset Manager",
-        preprocess: "Classic Preprocessing Lab",
-        'preprocess-bert': "BERT Preprocessing Lab (WordPiece)",
+        preprocess: "Preprocessing Lab",
         training: "Model Training & Jobs",
         evaluations: "Evaluation Lab & Rankings",
         mcnemar: "McNemar Significance Test",
@@ -182,16 +249,39 @@ function navigateToView(viewId) {
         registry: "Model Registry Lifecycle",
         profile: "Profil Pengguna & Keamanan"
     };
-    document.getElementById('view-title').textContent = viewTitleMap[viewId];
+    document.getElementById('view-title').textContent = viewTitleMap[viewId] || "Preprocessing Lab";
     
-    // Automatically close sidebar on mobile when navigating
+    // If navigating via alias, activate specific tab
+    if (targetTab && typeof switchPreprocessTab === 'function') {
+        switchPreprocessTab(targetTab);
+    }
+    
+    // Automatically close sidebar and sheet on mobile when navigating
     const sidebar = document.querySelector('.sidebar');
     if (sidebar && window.innerWidth <= 768) {
         sidebar.classList.remove('open');
     }
+    const mobileSheet = document.getElementById('mobile-more-sheet');
+    if (mobileSheet && !mobileSheet.classList.contains('hidden')) {
+        mobileSheet.classList.remove('active');
+        setTimeout(() => mobileSheet.classList.add('hidden'), 300);
+    }
     
     // View-specific trigger actions
     handleViewActivated(viewId);
+}
+
+function toggleMobileMoreDrawer() {
+    const sheet = document.getElementById('mobile-more-sheet');
+    if (sheet) {
+        if (sheet.classList.contains('hidden')) {
+            sheet.classList.remove('hidden');
+            setTimeout(() => sheet.classList.add('active'), 10);
+        } else {
+            sheet.classList.remove('active');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+    }
 }
 
 function handleViewActivated(viewId) {
@@ -277,10 +367,10 @@ function setAuthenticatedUser(user) {
     }
     
     hideLoginOverlay();
+    initSidebarState();
     
-    // Re-trigger router navigation depending on current hash
-    const initialHash = window.location.hash.substring(1) || 'dashboard';
-    navigateToView(initialHash);
+    const initialView = getViewFromPath();
+    navigateToView(initialView, true);
 }
 
 
@@ -288,6 +378,9 @@ document.getElementById('form-real-login').addEventListener('submit', (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
+    const submitBtn = document.getElementById('btn-real-login-submit');
+    
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Memproses...'; }
     
     showLoader();
     fetch('/api/v1/auth/login', {
@@ -298,24 +391,30 @@ document.getElementById('form-real-login').addEventListener('submit', (e) => {
     .then(res => res.json())
     .then(res => {
         if (res.success) {
-            showToast("Login Successful!");
+            showToast("Berhasil masuk ke lab!");
             setAuthenticatedUser(res.data);
         } else {
-            showToast(res.error || "Wrong email or password.", true);
+            showToast(res.error || "Email atau kata sandi tidak valid.", true);
         }
     })
-    .catch(() => showToast("Connection failed.", true))
-    .finally(() => hideLoader());
+    .catch(() => {
+        showToast("Koneksi ke server gagal.", true);
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Masuk ke Lab'; }
+    })
+    .finally(() => {
+        hideLoader();
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Masuk ke Lab'; }
+    });
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
     showLoader();
     fetch('/api/v1/auth/logout', { method: 'POST' })
         .then(() => {
-            showToast("Logged out successfully.");
+            showToast("Berhasil keluar dari akun.");
             STATE.user = null;
             showLoginOverlay();
-            window.location.hash = '#dashboard';
+            history.pushState({ view: 'dashboard' }, '', '/dashboard');
         })
         .finally(() => hideLoader());
 });
@@ -356,9 +455,9 @@ function loadUserProfile() {
         .finally(() => hideLoader());
 }
 
-// Sidebar Profile box redirect to #profile
+// Sidebar Profile box redirect to profile
 document.querySelector('.user-profile').addEventListener('click', () => {
-    window.location.hash = '#profile';
+    navigateToView('profile', true);
 });
 
 // Profile Picture (Avatar) Uploader Trigger and AJAX Submission
@@ -555,7 +654,7 @@ function fetchDashboardSummary() {
         .then(res => res.json())
         .then(res => {
             if (res.success) {
-                document.getElementById('dash-dataset-count').textContent = res.data.length;
+                animateCounter(document.getElementById('dash-dataset-count'), res.data.length);
             }
         });
         
@@ -567,8 +666,8 @@ function fetchDashboardSummary() {
                 const completedCount = jobs.filter(j => j.status === 'Completed').length;
                 const activeJobs = jobs.filter(j => ['Preparing', 'Downloading Model', 'Training', 'Evaluating'].includes(j.status));
                 
-                document.getElementById('dash-model-count').textContent = completedCount;
-                document.getElementById('dash-job-count').textContent = activeJobs.length;
+                animateCounter(document.getElementById('dash-model-count'), completedCount);
+                animateCounter(document.getElementById('dash-job-count'), activeJobs.length);
                 
                 if (activeJobs.length > 0) {
                     document.getElementById('dash-job-subtext').innerHTML = `<span class="text-pink animated-pulse">${activeJobs.length} training berjalan</span>`;
@@ -598,7 +697,18 @@ function fetchDashboardSummary() {
                                 <span>${job.exp_name} (${job.model_type.toUpperCase()})</span>
                                 <span class="badge ${statusClass}">${job.status}</span>
                             </div>
-                            <p class="text-rose-mauve mt-1">Dataset: ${job.dataset_name} • Duration: ${elapsed}</p>
+                            <div class="timeline-meta-grid">
+                                <div class="meta-row">
+                                    <span class="meta-label">Dataset</span>
+                                    <span class="meta-colon">:</span>
+                                    <span class="meta-val font-mono">${job.dataset_name}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Duration</span>
+                                    <span class="meta-colon">:</span>
+                                    <span class="meta-val font-mono">${elapsed}</span>
+                                </div>
+                            </div>
                         </div>
                     `;
                     list.appendChild(item);
@@ -646,13 +756,15 @@ function fetchDatasetsList() {
                     const date = new Date(dataset.uploaded_at).toLocaleString();
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="font-semibold text-dark">${dataset.name}</td>
-                        <td>${dataset.total_samples} baris</td>
-                        <td>${date}</td>
-                        <td><code class="text-xs bg-warm-gray p-1 rounded font-mono">${dataset.file_hash.substring(0, 12)}...</code></td>
-                        <td>
-                            <button class="btn btn-primary btn-sm mr-1" onclick="inspectDataset(${dataset.id})" title="Inspeksi Dataset"><i data-lucide="eye" class="inline w-3 h-3 mr-1"></i>Inspeksi</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDataset(${dataset.id}, '${dataset.name}')" title="Hapus Dataset"><i data-lucide="trash-2" class="inline w-3 h-3"></i></button>
+                        <td data-label="Nama Dataset" class="font-semibold text-dark card-header-cell">${dataset.name}</td>
+                        <td data-label="Total Baris"><span class="badge badge-neutral">${dataset.total_samples} baris</span></td>
+                        <td data-label="Waktu Unggah" class="text-xs text-rose-mauve">${date}</td>
+                        <td data-label="Hash (SHA256)"><code class="text-xs bg-warm-gray px-1.5 py-0.5 rounded font-mono">${dataset.file_hash.substring(0, 10)}...</code></td>
+                        <td data-label="Aksi" class="card-actions-cell">
+                            <div class="flex items-center gap-2 justify-end">
+                                <button class="btn btn-primary btn-sm btn-with-text" onclick="inspectDataset(${dataset.id})" title="Inspeksi Dataset"><i data-lucide="eye" class="w-3.5 h-3.5 mr-1 inline"></i>Lihat</button>
+                                <button class="btn btn-danger btn-sm btn-with-text" onclick="deleteDataset(${dataset.id}, '${dataset.name}')" title="Hapus Dataset"><i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1 inline"></i>Hapus</button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -759,12 +871,22 @@ function inspectDataset(id) {
                 
                 res.data.forEach(row => {
                     const tr = document.createElement('tr');
+                    const labelBadge = row.label === 'positive' || row.label === '1' || row.label === 1 ? 'badge-success' : (row.label === 'negative' || row.label === '-1' || row.label === -1 ? 'badge-danger' : 'badge-neutral');
                     tr.innerHTML = `
-                        <td class="text-xs text-rose-mauve text-wrap" style="max-width: 300px; word-break: break-word;">${row.text}</td>
-                        <td class="font-bold text-dark text-xs">${row.label}</td>
+                        <td data-label="Teks" class="text-xs text-dark wrap-cell">${row.text}</td>
+                        <td data-label="Label"><span class="badge ${labelBadge}">${row.label}</span></td>
                     `;
                     tbody.appendChild(tr);
                 });
+                // Auto-scroll to Dataset Details panel on mobile / tablet (< 1024px)
+                if (window.innerWidth <= 1024) {
+                    setTimeout(() => {
+                        const previewPanel = document.getElementById('dataset-details-panel');
+                        if (previewPanel) {
+                            previewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 120);
+                }
             }
         });
         
@@ -798,8 +920,213 @@ async function deleteDataset(id, name) {
 }
 
 
-// --- PREPROCESSING LAB WORKFLOW ---
-document.getElementById('btn-run-preprocess').addEventListener('click', () => {
+// --- PREPROCESSING LAB KNOWLEDGE BASE (INFO MODALS) ---
+const STEP_INFO_DETAILS = {
+    'classic-0': {
+        title: "Input Raw",
+        subtitle: "Teks Masukan Asli",
+        icon: "file-text",
+        badge: "Data Mentah",
+        description: "Kalimat masukan asli langsung dari pengguna atau data crawling media sosial tanpa modifikasi apa pun. Kalimat ini umumnya memiliki tingkat derau (<em>noise</em>) seperti URL, tagar (<em>hashtag</em>), mention akun (@user), emoji, dan karakter nonalfabet.",
+        role: "Menjadi titik awal (<em>baseline</em>) pemrosesan sebelum dilakukan ekstraksi fitur tekstual.",
+        comparison: "Sama persis antara kedua pipeline, sebagai data uji bersama."
+    },
+    'classic-1': {
+        title: "Case Folding & Noise Removal",
+        subtitle: "Pembersihan Karakter Non-Alfabet & Lowercasing",
+        icon: "scissors",
+        badge: "Pembersihan Derau",
+        description: "Mengubah seluruh huruf menjadi huruf kecil (<em>lowercasing</em>) dan menghapus tautan URL, mention, tanda baca, simbol, serta angka menggunakan ekspresi reguler (<em>Regular Expressions</em>).",
+        role: "Mencegah duplikasi fitur leksikal pada matriks TF-IDF. Kata 'Bagus', 'BAGUS', dan 'bagus!' akan diseragamkan menjadi satu token tunggal 'bagus'.",
+        comparison: "Pada model klasik, tanda baca dibuang total. Pada model deep learning tertentu, tanda baca dapat dipertahankan jika membawa konteks penekanan emosi."
+    },
+    'classic-2': {
+        title: "Tokenization & Slang Normalization",
+        subtitle: "Segmentasi Kata & Normalisasi Kata Gaul",
+        icon: "book-open",
+        badge: "Normalisasi Kamus",
+        description: "Memecah untaian teks menjadi daftar kata tunggal (<em>unigram tokens</em>), kemudian memetakan setiap kata gaul/singkatan ke bentuk baku Bahasa Indonesia berdasarkan kamus slang (misal: <code>bgt</code> &rarr; <code>sangat</code>, <code>sy</code> &rarr; <code>saya</code>, <code>sm</code> &rarr; <code>sama</code>, <code>udh</code> &rarr; <code>sudah</code>, <code>krn</code> &rarr; <code>karena</code>).",
+        role: "Meningkatkan kecocokan fitur teks dengan korpus pelatihan (<em>training vocabulary</em>) dan mencegah kata informal menjadi kata yang tidak dikenali.",
+        comparison: "Dilakukan pada kedua pipeline agar kata-kata informal dapat dikenali oleh model statistik maupun transformer."
+    },
+    'classic-3': {
+        title: "Stopword Removal",
+        subtitle: "Penyaringan Kata Tugas & Preservasi Negasi",
+        icon: "filter",
+        badge: "Filtrasi Fitur",
+        description: "Menghapus kata-kata fungsional umum yang sering muncul namun tidak membawa informasi polaritas sentimen (seperti <em>yang, di, dari, ke, ini, itu</em>). <strong>Penting:</strong> Penghapusan dilakukan secara selektif dengan <strong>mempertahankan kata negasi</strong> (<em>tidak, bukan, jangan, tanpa, belum</em>).",
+        role: "Mereduksi dimensi ruang vektor TF-IDF secara signifikan tanpa merusak makna pembalikan sentimen pada kalimat negatif.",
+        comparison: "Pipeline klasik membuang stopword untuk mereduksi dimensi. Sebaliknya, IndoBERT <u>TIDAK</u> membuang stopword agar urutan kalimat tetap utuh untuk mekanisme Self-Attention."
+    },
+    'classic-4': {
+        title: "Hasil Preprocessing",
+        subtitle: "Representasi Fitur Bersih untuk TF-IDF",
+        icon: "badge-check",
+        badge: "Output Klasik",
+        description: "Menggabungkan kembali token kata hasil pembersihan menjadi kalimat bersih yang padat makna kata kunci (<em>lexical density</em>).",
+        role: "Teks ini siap diubah menjadi vektor numerik frekuensi term (TF-IDF) untuk diklasifikasikan oleh algoritma Multinomial Naïve Bayes dan Support Vector Machine (SVM).",
+        comparison: "Hasil akhir berbentuk kalimat pendek tanpa kata tugas, berfokus pada frekuensi kemunculan kata independen."
+    },
+    'bert-0': {
+        title: "Input Raw",
+        subtitle: "Teks Masukan Asli",
+        icon: "file-text",
+        badge: "Input Transformer",
+        description: "Kalimat asli bahasa Indonesia yang menjadi masukan bagi arsitektur model Deep Learning Transformer.",
+        role: "Sebagai input komparasi langsung terhadap kinerja pemahaman konteks IndoBERT.",
+        comparison: "Identik dengan input pada model klasik."
+    },
+    'bert-1': {
+        title: "Normalisasi & Slang",
+        subtitle: "Case Folding & Slang (Stopword Dipertahankan)",
+        icon: "zap",
+        badge: "Minimal Cleaning",
+        description: "Hanya melakukan penyeragaman huruf kecil (<em>case folding</em>) dan penggantian singkatan gaul (<em>slang normalization</em>). Seluruh kata tugas (<em>stopword</em>) tetap <strong>dipertahankan secara penuh</strong>.",
+        role: "Mempertahankan hubungan gramatikal, urutan kata (<em>syntactic dependencies</em>), dan struktur kalimat yang utuh agar representasi semantik tidak cacat.",
+        comparison: "Sangat kontras dengan model klasik. Membuang stopword pada IndoBERT akan merusak pemahaman posisi kata dalam mekanisme Self-Attention."
+    },
+    'bert-2': {
+        title: "Hasil Preprocessing",
+        subtitle: "Teks Masukan Lengkap Siap Tokenisasi",
+        icon: "badge-check",
+        badge: "Konteks Utuh",
+        description: "Kalimat hasil normalisasi minimal yang masih memiliki tata bahasa dan struktur kalimat lengkap Bahasa Indonesia.",
+        role: "Diumpankan secara langsung ke modul <code>BertTokenizer</code> berbasis WordPiece.",
+        comparison: "Memiliki jumlah kata yang lebih lengkap dibandingkan output tahap 4 model klasik."
+    },
+    'bert-3': {
+        title: "Tokenisasi WordPiece",
+        subtitle: "Pemecahan Subkata & Token Khusus",
+        icon: "layers",
+        badge: "Subword Splitting",
+        description: "Algoritma WordPiece memecah kata menjadi unit subkata (<em>subword tokens</em>) yang ditandai prefiks <code>##</code> jika kata tidak ada dalam kamus. Ditambahkan token khusus <code>[CLS]</code> di awal (agregator representasi sentimen) dan <code>[SEP]</code> di akhir kalimat.",
+        role: "Menghilangkan permasalahan kata di luar kamus (<em>Out-Of-Vocabulary / OOV</em>), khususnya untuk kata-kata berafiks/berimbuhan kompleks khas Bahasa Indonesia (misal: <em>menakjubkan</em> &rarr; <code>menak</code>, <code>##jub</code>, <code>##kan</code>).",
+        comparison: "Model klasik menggunakan token kata utuh (<em>word-level</em>). IndoBERT menggunakan token subkata (<em>subword-level</em>)."
+    },
+    'bert-4': {
+        title: "Tensor & Attention Mask",
+        subtitle: "Pemetaan Token IDs & Matriks Masking",
+        icon: "cpu",
+        badge: "Tensor PyTorch",
+        description: "Setiap token subkata dipetakan ke ID integer unik (<em>Token ID</em>) dari total 30.521 vocabulary IndoBERT. <em>Attention Mask</em> bernilai <code>1</code> untuk token nyata dan <code>0</code> untuk token padding <code>[PAD]</code>. Panjang tensor diseragamkan dengan padding tetap (<code>max_length = 32</code>).",
+        role: "Menghasilkan tensor numerik 2D [Batch_Size, Max_Length] yang siap masuk ke Multi-Head Self-Attention Transformer Blocks di PyTorch.",
+        comparison: "Model klasik menghasilkan representasi vektor jarang (<em>sparse TF-IDF matrix</em>), sedangkan IndoBERT menghasilkan tensor padat (<em>dense contextual embeddings</em>)."
+    }
+};
+
+function formatRichMarkdown(text) {
+    if (!text) return '';
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+}
+
+function showPreprocessStepInfo(stepKey) {
+    const info = STEP_INFO_DETAILS[stepKey];
+    if (!info) return;
+
+    const modal = document.getElementById('preprocess-info-modal');
+    const titleEl = document.getElementById('info-modal-title');
+    const subtitleEl = document.getElementById('info-modal-subtitle');
+    const bodyEl = document.getElementById('info-modal-body');
+    const iconContainer = document.getElementById('info-modal-icon-container');
+
+    if (titleEl) titleEl.textContent = info.title;
+    if (subtitleEl) subtitleEl.textContent = info.subtitle;
+    if (iconContainer) {
+        iconContainer.innerHTML = `<i data-lucide="${info.icon || 'file-text'}" class="w-6 h-6 text-white" style="width: 24px; height: 24px;"></i>`;
+    }
+
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+            <div class="info-overview-card">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="info-badge-pill">
+                        <i data-lucide="tag" class="w-3.5 h-3.5 inline mr-1"></i>${info.badge}
+                    </span>
+                    <span class="font-bold uppercase tracking-wider" style="color: #E94F9A; font-size: 0.75rem; letter-spacing: 0.08em;">PIPELINE INFO</span>
+                </div>
+                <p class="font-normal leading-relaxed text-dark" style="font-size: 0.9rem; line-height: 1.7; color: #2D2230; margin-top: 12px;">${formatRichMarkdown(info.description)}</p>
+            </div>
+            
+            <div class="space-y-3 mt-3">
+                <div class="info-callout-card accent-purple">
+                    <div class="callout-icon-circle purple">
+                        <i data-lucide="target" class="w-5 h-5"></i>
+                    </div>
+                    <div class="callout-content">
+                        <h5 class="callout-title purple">PERAN & TUJUAN ILMIAH</h5>
+                        <p class="callout-desc">${formatRichMarkdown(info.role)}</p>
+                    </div>
+                </div>
+                
+                <div class="info-callout-card accent-pink">
+                    <div class="callout-icon-circle pink">
+                        <i data-lucide="scale" class="w-5 h-5"></i>
+                    </div>
+                    <div class="callout-content">
+                        <h5 class="callout-title pink">KOMPARASI TEORETIS</h5>
+                        <p class="callout-desc">${formatRichMarkdown(info.comparison)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (modal) {
+        modal.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+            modal.classList.add('active');
+            if (window.lucide) lucide.createIcons();
+        }, 10);
+    }
+}
+
+function closePreprocessInfoModal() {
+    const modal = document.getElementById('preprocess-info-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 250);
+    }
+}
+
+// Bind directly to window for guaranteed inline onclick accessibility
+window.showPreprocessStepInfo = showPreprocessStepInfo;
+window.closePreprocessInfoModal = closePreprocessInfoModal;
+
+// Close info modal on clicking backdrop
+document.getElementById('preprocess-info-modal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('preprocess-info-modal')) {
+        closePreprocessInfoModal();
+    }
+});
+
+
+// --- PREPROCESSING LAB WORKFLOW (SIMULTANEOUS SIDE-BY-SIDE) ---
+function fillPreprocessSample(sampleId) {
+    const input = document.getElementById('preprocess-input');
+    const bertInput = document.getElementById('preprocess-bert-input');
+    if (!input) return;
+    if (sampleId === 1) {
+        input.value = "Pelayanan staf lab sangat memuaskan, tempatnya bersih dan responnya cepat!";
+    } else {
+        input.value = "Wah gila sih pelayanan di sini bener-bener mantul bgt! Suka bgt sama respon adminnya keren abis.";
+    }
+    if (bertInput) bertInput.value = input.value;
+    showToast("Contoh kalimat berhasil dimasukkan.");
+}
+
+// Sync input events between inputs
+document.getElementById('preprocess-input')?.addEventListener('input', (e) => {
+    const bertInput = document.getElementById('preprocess-bert-input');
+    if (bertInput) bertInput.value = e.target.value;
+});
+
+// Run Both Preprocessing Pipelines Simultaneously Side-by-Side
+document.getElementById('btn-run-preprocess')?.addEventListener('click', () => {
     const text = document.getElementById('preprocess-input').value;
     if (!text.trim()) {
         showToast("Kalimat uji tidak boleh kosong.", true);
@@ -807,17 +1134,47 @@ document.getElementById('btn-run-preprocess').addEventListener('click', () => {
     }
     
     showLoader();
-    fetch('/api/v1/preprocess', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.success) {
-            const data = res.data;
-            
-            // Render terminal steps elegantly with slight delays to feel real
+    
+    // Clear old BERT outputs first
+    const step3 = document.getElementById('bert-step-3');
+    const step4 = document.getElementById('bert-step-4');
+    const tokensContainer = document.getElementById('bert-term-tokens');
+    const tableBody = document.getElementById('bert-term-table-body');
+    const tensorIds = document.getElementById('bert-term-tensor-ids');
+    
+    if (step3) step3.style.display = 'none';
+    if (step4) step4.style.display = 'none';
+    if (tokensContainer) tokensContainer.innerHTML = '';
+    if (tableBody) tableBody.innerHTML = '';
+    if (tensorIds) tensorIds.textContent = '-';
+    
+    // Set loading indicator in both terminals
+    const classicSteps = ['term-casefolded', 'term-tokens', 'term-stopwords', 'term-processed'];
+    classicSteps.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = "Processing...";
+    });
+    const bertNormalized = document.getElementById('bert-term-normalized');
+    const bertProcessed = document.getElementById('bert-term-processed');
+    if (bertNormalized) bertNormalized.textContent = "Processing...";
+    if (bertProcessed) bertProcessed.textContent = "Finalizing...";
+
+    Promise.all([
+        fetch('/api/v1/preprocess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        }).then(r => r.json()),
+        fetch('/api/v1/preprocess/bert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        }).then(r => r.json())
+    ])
+    .then(([classicRes, bertRes]) => {
+        // 1. Render Classic Pipeline (Left Column)
+        if (classicRes.success) {
+            const data = classicRes.data;
             document.getElementById('term-raw').textContent = `"${data.raw}"`;
             
             const steps = [
@@ -829,123 +1186,91 @@ document.getElementById('btn-run-preprocess').addEventListener('click', () => {
             
             steps.forEach((step, idx) => {
                 const element = document.getElementById(step.id);
-                element.textContent = "Processing...";
-                
-                setTimeout(() => {
-                    element.textContent = step.val;
-                }, (idx + 1) * 350); // delay step presentation
+                if (element) {
+                    setTimeout(() => {
+                        element.textContent = step.val;
+                    }, (idx + 1) * 200);
+                }
             });
-        } else {
-            showToast(res.error || "Gagal memproses teks.", true);
         }
-    })
-    .catch(() => showToast("Connection failed.", true))
-    .finally(() => hideLoader());
-});
-
-
-// --- BERT PREPROCESSING LAB WORKFLOW ---
-document.getElementById('btn-run-preprocess-bert').addEventListener('click', () => {
-    const text = document.getElementById('preprocess-bert-input').value;
-    if (!text.trim()) {
-        showToast("Kalimat uji tidak boleh kosong.", true);
-        return;
-    }
-    
-    showLoader();
-    fetch('/api/v1/preprocess/bert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.success) {
-            const data = res.data;
-            // Clear old outputs first
-            document.getElementById('bert-step-3').style.display = 'none';
-            document.getElementById('bert-step-4').style.display = 'none';
-            document.getElementById('bert-term-tokens').innerHTML = '';
-            document.getElementById('bert-term-table-body').innerHTML = '';
-            document.getElementById('bert-term-tensor-ids').textContent = '-';
-
-            // Step 0 raw text
+        
+        // 2. Render IndoBERT Pipeline (Right Column)
+        if (bertRes.success) {
+            const data = bertRes.data;
             document.getElementById('bert-term-raw').textContent = `"${data.raw}"`;
             
-            // Step 1 normalized text (text_minimal)
-            const normalizedEl = document.getElementById('bert-term-normalized');
-            normalizedEl.textContent = "Processing...";
             setTimeout(() => {
-                normalizedEl.textContent = `"${data.normalized}"`;
-            }, 300);
+                if (bertNormalized) bertNormalized.textContent = `"${data.normalized}"`;
+            }, 200);
             
-            // Step 2 final preprocessed text
-            const processedEl = document.getElementById('bert-term-processed');
-            processedEl.textContent = "Finalizing...";
             setTimeout(() => {
-                processedEl.textContent = `"${data.normalized}"`;
-            }, 600);
+                if (bertProcessed) bertProcessed.textContent = `"${data.normalized}"`;
+            }, 400);
 
             // Step 3 WordPiece Subword tokens
             setTimeout(() => {
-                document.getElementById('bert-step-3').style.display = 'flex';
-                const tokensContainer = document.getElementById('bert-term-tokens');
-                data.tokens.forEach(tok => {
-                    const badge = document.createElement('span');
-                    badge.style.padding = '4px 8px';
-                    badge.style.margin = '4px';
-                    badge.style.borderRadius = '6px';
-                    badge.style.fontSize = '12px';
-                    badge.style.fontFamily = 'monospace';
-                    badge.style.fontWeight = 'bold';
-                    badge.style.display = 'inline-block';
-                    
-                    if (tok.startsWith('##')) {
-                        badge.style.backgroundColor = 'rgba(236, 72, 153, 0.12)';
-                        badge.style.color = '#ec4899';
-                        badge.style.border = '1px solid rgba(236, 72, 153, 0.25)';
-                    } else if (tok === '[CLS]' || tok === '[SEP]' || tok === '[PAD]') {
-                        badge.style.backgroundColor = 'rgba(139, 92, 246, 0.12)';
-                        badge.style.color = '#8b5cf6';
-                        badge.style.border = '1px solid rgba(139, 92, 246, 0.25)';
-                    } else {
-                        badge.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
-                        badge.style.color = '#10b981';
-                        badge.style.border = '1px solid rgba(16, 185, 129, 0.25)';
-                    }
-                    badge.textContent = tok;
-                    tokensContainer.appendChild(badge);
-                });
-            }, 900);
+                if (step3) step3.style.display = 'flex';
+                if (tokensContainer) {
+                    tokensContainer.innerHTML = '';
+                    data.tokens.forEach(tok => {
+                        const badge = document.createElement('span');
+                        badge.style.padding = '4px 8px';
+                        badge.style.margin = '4px';
+                        badge.style.borderRadius = '6px';
+                        badge.style.fontSize = '0.75rem';
+                        badge.style.fontFamily = 'monospace';
+                        badge.style.fontWeight = 'bold';
+                        badge.style.display = 'inline-block';
+                        
+                        if (tok.startsWith('##')) {
+                            badge.style.backgroundColor = 'rgba(236, 72, 153, 0.12)';
+                            badge.style.color = '#ec4899';
+                            badge.style.border = '1px solid rgba(236, 72, 153, 0.25)';
+                        } else if (tok === '[CLS]' || tok === '[SEP]' || tok === '[PAD]') {
+                            badge.style.backgroundColor = 'rgba(139, 92, 246, 0.12)';
+                            badge.style.color = '#8b5cf6';
+                            badge.style.border = '1px solid rgba(139, 92, 246, 0.25)';
+                        } else {
+                            badge.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
+                            badge.style.color = '#10b981';
+                            badge.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+                        }
+                        badge.textContent = tok;
+                        tokensContainer.appendChild(badge);
+                    });
+                }
+            }, 600);
 
             // Step 4 Tensor map & Padded IDs
             setTimeout(() => {
-                document.getElementById('bert-step-4').style.display = 'flex';
-                const tableBody = document.getElementById('bert-term-table-body');
+                if (step4) step4.style.display = 'flex';
+                if (tableBody) {
+                    tableBody.innerHTML = '';
+                    data.tokens.forEach((tok, idx) => {
+                        const id = data.token_ids[idx];
+                        const mask = data.attention_mask[idx];
+                        
+                        const row = document.createElement('tr');
+                        row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+                        row.innerHTML = `
+                            <td data-label="Index" style="padding: 6px 12px; font-family: monospace; color: var(--text-muted);">${idx}</td>
+                            <td data-label="Subword Token" style="padding: 6px 12px; font-weight: bold; color: ${tok.startsWith('##') ? '#ec4899' : (tok.startsWith('[') ? '#8b5cf6' : 'var(--text-dark)')}">${tok}</td>
+                            <td data-label="Token ID" style="padding: 6px 12px; text-align: right; font-family: monospace; color: #d53f8c;">${id}</td>
+                            <td data-label="Attention Mask" style="padding: 6px 12px; text-align: center; font-family: monospace;"><span style="background-color: ${mask === 1 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${mask === 1 ? '#10b981' : '#ef4444'}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${mask}</span></td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
                 
-                data.tokens.forEach((tok, idx) => {
-                    const id = data.token_ids[idx];
-                    const mask = data.attention_mask[idx];
-                    
-                    const row = document.createElement('tr');
-                    row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
-                    row.innerHTML = `
-                        <td style="padding: 6px 12px; font-family: monospace; color: var(--text-muted);">${idx}</td>
-                        <td style="padding: 6px 12px; font-weight: bold; color: ${tok.startsWith('##') ? '#ec4899' : (tok.startsWith('[') ? '#8b5cf6' : 'var(--text-dark)')}">${tok}</td>
-                        <td style="padding: 6px 12px; text-align: right; font-family: monospace; color: #d53f8c;">${id}</td>
-                        <td style="padding: 6px 12px; text-align: center; font-family: monospace;"><span style="background-color: ${mask === 1 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${mask === 1 ? '#10b981' : '#ef4444'}; padding: 2px 6px; border-radius: 4px; font-size: 11px;">${mask}</span></td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-                
-                document.getElementById('bert-term-tensor-ids').textContent = `[${data.padded_token_ids.join(', ')}]`;
-            }, 1200);
-            
-        } else {
-            showToast(res.error || "Gagal memproses teks untuk BERT.", true);
+                if (tensorIds) {
+                    tensorIds.textContent = `[${data.padded_token_ids.join(', ')}]`;
+                }
+            }, 800);
         }
+        
+        showToast("Kedua pipeline preprocessing berhasil dieksekusi!");
     })
-    .catch(() => showToast("Connection failed.", true))
+    .catch(() => showToast("Gagal memproses teks.", true))
     .finally(() => hideLoader());
 });
 
@@ -1128,7 +1453,7 @@ document.getElementById('form-train').addEventListener('submit', (e) => {
             showToast(res.error || "Gagal menjalankan eksperimen.", true);
         }
     })
-    .catch(() => showToast("Connection error.", true))
+    .catch(() => showToast("Terjadi kesalahan koneksi ke server.", true))
     .finally(() => hideLoader());
 });
 
@@ -1265,6 +1590,7 @@ function fetchJobsHistory() {
                     const duration = job.training_time ? `${Math.round(job.training_time)} detik` : 'running';
                     const progressStyle = `width: ${job.progress}%`;
                     const statusClass = job.status === 'Completed' ? 'badge-success' : (job.status === 'Failed' ? 'badge-danger' : (job.status === 'Cancelled' ? 'badge-neutral' : 'badge-warning'));
+                    const statusDot = `<span class="badge-dot"></span>`;
                     
                     const isRunning = ['Preparing', 'Downloading Model', 'Training', 'Evaluating'].includes(job.status);
                     let actionHtml = '';
@@ -1272,26 +1598,30 @@ function fetchJobsHistory() {
                         actionHtml = `<button class="btn btn-danger btn-sm" onclick="cancelJobHistory(${job.id})" title="Batalkan Training"><i data-lucide="x-circle" class="inline w-3.5 h-3.5 mr-1"></i>Batalkan</button>`;
                     } else {
                         if (job.status === 'Completed') {
-                            actionHtml += `<button class="btn btn-primary btn-sm mr-1" onclick="location.hash='#evaluations'; inspectModel(${job.id})" title="Evaluasi & Inspeksi"><i data-lucide="award" class="inline w-3 h-3"></i></button>`;
+                            actionHtml += `<button class="btn btn-primary btn-sm mr-1" onclick="navigateToView('evaluations', true); inspectModel(${job.id})" title="Evaluasi & Inspeksi"><i data-lucide="award" class="inline w-3.5 h-3.5"></i></button>`;
                         }
-                        actionHtml += `<button class="btn btn-danger btn-sm" onclick="deleteJobHistory(${job.id})" title="Hapus Riwayat"><i data-lucide="trash-2" class="inline w-3 h-3"></i></button>`;
+                        actionHtml += `<button class="btn btn-danger btn-sm" onclick="deleteJobHistory(${job.id})" title="Hapus Riwayat"><i data-lucide="trash-2" class="inline w-3.5 h-3.5"></i></button>`;
                     }
                         
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="font-bold text-xs">${job.id}</td>
-                        <td class="font-semibold text-dark">${job.exp_name}</td>
-                        <td>${job.dataset_name}</td>
-                        <td><span class="badge badge-neutral">${job.model_type.toUpperCase()}</span></td>
-                        <td>${duration}</td>
-                        <td>
-                            <div class="progress-track" style="height:4px; max-width:80px">
+                        <td data-label="ID" class="font-bold text-xs font-mono">#${job.id}</td>
+                        <td data-label="Eksperimen" class="font-semibold text-dark card-header-cell">${job.exp_name}</td>
+                        <td data-label="Dataset" class="text-xs text-rose-mauve">${job.dataset_name}</td>
+                        <td data-label="Model"><span class="badge badge-neutral">${job.model_type.toUpperCase()}</span></td>
+                        <td data-label="Durasi Latih" class="font-mono text-xs">${duration}</td>
+                        <td data-label="Progres">
+                            <div class="progress-track" style="height:6px; min-width:70px; max-width:90px; border-radius: 4px;">
                                 <div class="progress-fill" style="${progressStyle}"></div>
                             </div>
                         </td>
-                        <td><span class="badge ${statusClass}">${job.status}</span></td>
-                        <td class="text-xs text-rose-mauve">${date}</td>
-                        <td class="text-center">${actionHtml}</td>
+                        <td data-label="Status"><span class="badge ${statusClass}">${statusDot}${job.status}</span></td>
+                        <td data-label="Waktu Mulai" class="text-xs text-rose-mauve">${date}</td>
+                        <td data-label="Aksi" class="card-actions-cell">
+                            <div class="flex items-center gap-1 justify-end">
+                                ${actionHtml}
+                            </div>
+                        </td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1362,7 +1692,7 @@ function fetchRankingsList() {
                 tbody.innerHTML = '';
                 
                 if (evals.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-rose-mauve py-6">Belum ada model terevaluasi. Selesaikan training model terlebih dahulu.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-rose-mauve py-6">Belum ada model terevaluasi. Selesaikan training model terlebih dahulu.</td></tr>';
                     return;
                 }
                 
@@ -1372,17 +1702,26 @@ function fetchRankingsList() {
                     const prec = (ev.precision * 100).toFixed(2) + "%";
                     const rec = (ev.recall * 100).toFixed(2) + "%";
                     
+                    let rankBadge = '';
+                    if (idx === 0) rankBadge = '<span class="rank-badge-1" title="Peringkat 1">🥇</span>';
+                    else if (idx === 1) rankBadge = '<span class="rank-badge-2" title="Peringkat 2">🥈</span>';
+                    else if (idx === 2) rankBadge = '<span class="rank-badge-3" title="Peringkat 3">🥉</span>';
+                    else rankBadge = `<span class="font-bold text-xs text-rose-mauve">#${idx + 1}</span>`;
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="font-bold text-xs">${ev.experiment_job_id}</td>
-                        <td class="font-semibold text-dark">${ev.exp_name}</td>
-                        <td><span class="badge badge-neutral">${ev.model_type.toUpperCase()}</span></td>
-                        <td class="font-bold text-dark">${acc}</td>
-                        <td>${prec}</td>
-                        <td>${rec}</td>
-                        <td class="font-bold text-pink">${f1}</td>
-                        <td>
-                            <button class="btn btn-primary btn-sm" onclick="inspectModel(${ev.experiment_job_id})"><i data-lucide="zoom-in" class="inline w-3 h-3 mr-1"></i>Inspeksi</button>
+                        <td data-label="Peringkat" class="text-center">${rankBadge}</td>
+                        <td data-label="ID" class="font-bold text-xs font-mono">#${ev.experiment_job_id}</td>
+                        <td data-label="Nama Model" class="font-semibold text-dark card-header-cell">${ev.exp_name}</td>
+                        <td data-label="Arsitektur"><span class="badge badge-neutral">${ev.model_type.toUpperCase()}</span></td>
+                        <td data-label="Akurasi" class="font-bold text-dark font-mono text-xs">${acc}</td>
+                        <td data-label="Presisi" class="font-mono text-xs">${prec}</td>
+                        <td data-label="Recall" class="font-mono text-xs">${rec}</td>
+                        <td data-label="Macro F1" class="font-bold text-pink font-mono text-xs">${f1}</td>
+                        <td data-label="Aksi" class="card-actions-cell">
+                            <div class="flex items-center justify-center">
+                                <button class="btn btn-primary btn-sm btn-with-text" onclick="inspectModel(${ev.experiment_job_id})" title="Inspeksi Model"><i data-lucide="zoom-in" class="inline w-3 h-3 mr-1"></i>Inspeksi</button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -1405,7 +1744,10 @@ function inspectModel(jobId) {
                 const ev = job.evaluation;
                 
                 document.getElementById('no-eval-selected').classList.add('hidden');
-                document.getElementById('eval-selected-panel').classList.remove('hidden');
+                const selectedPanel = document.getElementById('eval-selected-panel');
+                selectedPanel.classList.remove('hidden');
+                selectedPanel.classList.add('animate-fadeIn');
+                setTimeout(() => selectedPanel.classList.remove('animate-fadeIn'), 400);
                 
                 document.getElementById('inspect-model-name').textContent = job.exp_name;
                 document.getElementById('inspect-model-type').textContent = `Algoritma: ${job.model_type.toUpperCase()} • Duration: ${Math.round(job.training_time)}s`;
@@ -1450,22 +1792,17 @@ function inspectModel(jobId) {
                 
                 const classKeys = Object.keys(classes).filter(k => !['accuracy', 'macro avg', 'weighted avg'].includes(k));
                 
-                // Calculate total support
-                let totalSupport = 0;
-                classKeys.forEach(k => {
-                    totalSupport += Math.round(classes[k].support || 0);
-                });
-
                 // 1. Individual classes (negative, neutral, positive)
                 classKeys.forEach(k => {
                     const rowData = classes[k];
                     const tr = document.createElement('tr');
+                    const badgeClass = k.toLowerCase().includes('pos') ? 'badge-success' : (k.toLowerCase().includes('neg') ? 'badge-danger' : 'badge-neutral');
                     tr.innerHTML = `
-                        <td class="font-medium">${k}</td>
-                        <td class="text-right">${rowData.precision.toFixed(4)}</td>
-                        <td class="text-right">${rowData.recall.toFixed(4)}</td>
-                        <td class="text-right">${rowData['f1-score'].toFixed(4)}</td>
-                        <td class="text-right">${Math.round(rowData.support)}</td>
+                        <td data-label="Kelas" class="font-semibold text-dark card-header-cell"><span class="badge ${badgeClass}">${k.toUpperCase()}</span></td>
+                        <td data-label="Precision" class="text-right font-mono text-xs">${rowData.precision.toFixed(2)}</td>
+                        <td data-label="Recall" class="text-right font-mono text-xs">${rowData.recall.toFixed(2)}</td>
+                        <td data-label="F1-Score" class="text-right font-mono text-xs font-bold text-pink">${rowData['f1-score'].toFixed(2)}</td>
+                        <td data-label="Support" class="text-right font-mono text-xs text-rose-mauve">${Math.round(rowData.support)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1475,11 +1812,11 @@ function inspectModel(jobId) {
                 if (accVal !== undefined) {
                     const trAcc = document.createElement('tr');
                     trAcc.innerHTML = `
-                        <td class="font-medium">accuracy</td>
-                        <td class="text-right"></td>
-                        <td class="text-right"></td>
-                        <td class="text-right">${accVal.toFixed(4)}</td>
-                        <td class="text-right">${totalSupport}</td>
+                        <td data-label="Metrik" class="font-bold text-dark card-header-cell">Accuracy</td>
+                        <td data-label="Precision" class="text-right font-mono text-xs text-rose-mauve">-</td>
+                        <td data-label="Recall" class="text-right font-mono text-xs text-rose-mauve">-</td>
+                        <td data-label="F1-Score" class="text-right font-mono text-xs font-bold text-pink">${accVal.toFixed(2)}</td>
+                        <td data-label="Support" class="text-right font-mono text-xs text-rose-mauve">${classes['macro avg'] ? Math.round(classes['macro avg'].support) : '-'}</td>
                     `;
                     tbody.appendChild(trAcc);
                 }
@@ -1489,11 +1826,11 @@ function inspectModel(jobId) {
                 if (macroVal) {
                     const trMacro = document.createElement('tr');
                     trMacro.innerHTML = `
-                        <td class="font-medium">macro avg</td>
-                        <td class="text-right">${macroVal.precision.toFixed(4)}</td>
-                        <td class="text-right">${macroVal.recall.toFixed(4)}</td>
-                        <td class="text-right">${macroVal['f1-score'].toFixed(4)}</td>
-                        <td class="text-right">${Math.round(macroVal.support)}</td>
+                        <td data-label="Metrik" class="font-bold text-dark card-header-cell">Macro Avg</td>
+                        <td data-label="Precision" class="text-right font-mono text-xs">${macroVal.precision.toFixed(2)}</td>
+                        <td data-label="Recall" class="text-right font-mono text-xs">${macroVal.recall.toFixed(2)}</td>
+                        <td data-label="F1-Score" class="text-right font-mono text-xs font-bold text-pink">${macroVal['f1-score'].toFixed(2)}</td>
+                        <td data-label="Support" class="text-right font-mono text-xs text-rose-mauve">${Math.round(macroVal.support)}</td>
                     `;
                     tbody.appendChild(trMacro);
                 }
@@ -1503,13 +1840,23 @@ function inspectModel(jobId) {
                 if (weightedVal) {
                     const trWeighted = document.createElement('tr');
                     trWeighted.innerHTML = `
-                        <td class="font-medium">weighted avg</td>
-                        <td class="text-right">${weightedVal.precision.toFixed(4)}</td>
-                        <td class="text-right">${weightedVal.recall.toFixed(4)}</td>
-                        <td class="text-right">${weightedVal['f1-score'].toFixed(4)}</td>
-                        <td class="text-right">${Math.round(weightedVal.support)}</td>
+                        <td data-label="Metrik" class="font-bold text-dark card-header-cell">Weighted Avg</td>
+                        <td data-label="Precision" class="text-right font-mono text-xs">${weightedVal.precision.toFixed(2)}</td>
+                        <td data-label="Recall" class="text-right font-mono text-xs">${weightedVal.recall.toFixed(2)}</td>
+                        <td data-label="F1-Score" class="text-right font-mono text-xs font-bold text-pink">${weightedVal['f1-score'].toFixed(2)}</td>
+                        <td data-label="Support" class="text-right font-mono text-xs text-rose-mauve">${Math.round(weightedVal.support)}</td>
                     `;
                     tbody.appendChild(trWeighted);
+                }
+
+                // Auto-scroll to Detail Evaluasi Model on mobile / tablet (< 1024px)
+                if (window.innerWidth <= 1024) {
+                    setTimeout(() => {
+                        const targetPanel = document.getElementById('detail-eval-panel-card') || document.getElementById('eval-selected-panel');
+                        if (targetPanel) {
+                            targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 120);
                 }
             } else {
                 showToast("Evaluasi model tidak ditemukan.", true);
@@ -1519,7 +1866,7 @@ function inspectModel(jobId) {
 }
 
 
-// --- MCNEMAR SIGNIFICANCE LAB ---
+// --- MCNEMAR SIGNIFICANCE LAB & MODEL SELECTOR THEMED ENGINE ---
 function fetchModelsDropdowns(dropdownIds) {
     fetch('/api/v1/experiments/jobs')
         .then(res => res.json())
@@ -1530,14 +1877,120 @@ function fetchModelsDropdowns(dropdownIds) {
                 dropdownIds.forEach(ddId => {
                     const select = document.getElementById(ddId);
                     if (!select) return;
+                    
+                    // Keep native select in sync for form submissions
                     select.innerHTML = `<option value="">-- Pilih Model --</option>`;
                     completedJobs.forEach(job => {
                         select.innerHTML += `<option value="${job.id}">${job.exp_name} [${job.model_type.toUpperCase()}] (Dataset: ${job.dataset_name})</option>`;
                     });
+                    
+                    // Hide native select visually
+                    select.style.display = 'none';
+
+                    // Ensure custom themed dropdown container exists
+                    let customWrap = select.parentElement.querySelector('.custom-dropdown-container');
+                    if (!customWrap) {
+                        customWrap = document.createElement('div');
+                        customWrap.className = 'custom-dropdown-container';
+                        select.parentElement.insertBefore(customWrap, select.nextSibling);
+                    }
+
+                    // Build trigger button and menu with 3-row aligned meta list
+                    customWrap.innerHTML = `
+                        <button type="button" class="custom-dropdown-trigger" id="trigger-${ddId}">
+                            <span class="custom-dropdown-selected-text text-rose-mauve">-- Pilih Model --</span>
+                            <i data-lucide="chevron-down" class="custom-dropdown-arrow inline-block w-4 h-4"></i>
+                        </button>
+                        <div class="custom-dropdown-menu hidden" id="menu-${ddId}">
+                            ${completedJobs.length === 0 ? '<div class="p-3 text-center text-xs text-rose-mauve">Belum ada model terlatih.</div>' : ''}
+                            ${completedJobs.map(job => `
+                                <div class="custom-dropdown-item" data-value="${job.id}">
+                                    <div class="timeline-meta-grid">
+                                        <div class="meta-row">
+                                            <span class="meta-label">Nama model</span>
+                                            <span class="meta-colon">:</span>
+                                            <span class="meta-val font-bold text-dark">${job.exp_name}</span>
+                                        </div>
+                                        <div class="meta-row">
+                                            <span class="meta-label">Algoritma</span>
+                                            <span class="meta-colon">:</span>
+                                            <span class="meta-val text-purple font-semibold">${job.model_type.toUpperCase()}</span>
+                                        </div>
+                                        <div class="meta-row">
+                                            <span class="meta-label">Dataset</span>
+                                            <span class="meta-colon">:</span>
+                                            <span class="meta-val text-rose-mauve font-mono">${job.dataset_name}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+
+                    if (window.lucide) lucide.createIcons({ root: customWrap });
+
+                    const trigger = customWrap.querySelector('.custom-dropdown-trigger');
+                    const menu = customWrap.querySelector('.custom-dropdown-menu');
+                    const textSpan = customWrap.querySelector('.custom-dropdown-selected-text');
+                    const items = customWrap.querySelectorAll('.custom-dropdown-item');
+
+                    // Toggle open/close
+                    trigger.onclick = (e) => {
+                        e.stopPropagation();
+                        // Close other open custom dropdowns
+                        document.querySelectorAll('.custom-dropdown-container').forEach(c => {
+                            if (c !== customWrap) {
+                                c.classList.remove('is-open');
+                                const m = c.querySelector('.custom-dropdown-menu');
+                                if (m) m.classList.add('hidden');
+                            }
+                        });
+                        const isOpen = customWrap.classList.toggle('is-open');
+                        menu.classList.toggle('hidden', !isOpen);
+                    };
+
+                    // Item selection handler
+                    items.forEach(item => {
+                        item.onclick = (e) => {
+                            e.stopPropagation();
+                            const val = item.dataset.value;
+                            const job = completedJobs.find(j => String(j.id) === String(val));
+                            if (job) {
+                                select.value = job.id;
+                                select.dispatchEvent(new Event('change'));
+                                textSpan.textContent = `${job.exp_name} [${job.model_type.toUpperCase()}]`;
+                                textSpan.className = "custom-dropdown-selected-text text-dark font-bold";
+                                items.forEach(i => i.classList.remove('is-selected'));
+                                item.classList.add('is-selected');
+                            }
+                            customWrap.classList.remove('is-open');
+                            menu.classList.add('hidden');
+                        };
+                    });
+
+                    // Set initial value if select already has one
+                    if (select.value) {
+                        const initJob = completedJobs.find(j => String(j.id) === String(select.value));
+                        if (initJob) {
+                            textSpan.textContent = `${initJob.exp_name} [${initJob.model_type.toUpperCase()}]`;
+                            textSpan.className = "custom-dropdown-selected-text text-dark font-bold";
+                            const matchItem = customWrap.querySelector(`[data-value="${initJob.id}"]`);
+                            if (matchItem) matchItem.classList.add('is-selected');
+                        }
+                    }
                 });
             }
         });
 }
+
+// Global click outside to close custom dropdowns
+document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-dropdown-container').forEach(c => {
+        c.classList.remove('is-open');
+        const m = c.querySelector('.custom-dropdown-menu');
+        if (m) m.classList.add('hidden');
+    });
+});
 
 document.getElementById('form-mcnemar').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1572,29 +2025,48 @@ document.getElementById('form-mcnemar').addEventListener('submit', (e) => {
             
             // Format P-Value
             const pVal = data.p_value;
-            let pValStr = "";
+            let pValMain = "";
+            let pValSub = "";
+            
             if (pVal === 0) {
-                pValStr = "0.0 (0)";
+                pValMain = "0.0000";
+                pValSub = "Nilai P-Value sangat mendekati 0";
             } else if (pVal < 0.0001) {
-                const decimals = Math.max(6, -Math.floor(Math.log10(pVal)) + 2);
-                pValStr = `${pVal.toFixed(decimals)} (${pVal.toExponential(2)})`;
+                pValMain = pVal.toExponential(4);
+                pValSub = `Desimal: ${pVal.toFixed(8)}`;
             } else {
-                pValStr = pVal.toFixed(6);
+                pValMain = pVal.toFixed(6);
+                pValSub = `Eksponensial: ${pVal.toExponential(2)}`;
             }
-            document.getElementById('mc-p-value').textContent = pValStr;
+            
+            document.getElementById('mc-p-value').textContent = pValMain;
+            const subEl = document.getElementById('mc-p-subtext');
+            if (subEl) subEl.textContent = pValSub;
             
             const card = document.getElementById('mc-sig-card');
             const conclusion = document.getElementById('mc-conclusion');
             const explanation = document.getElementById('mc-explanation-text');
             
             if (data.significant) {
-                card.className = "mcnemar-status-card significant text-center p-4 rounded-xl mb-4";
+                card.className = "mcnemar-status-card significant text-center p-4 rounded-2xl";
                 conclusion.textContent = "Signifikan Secara Statistik (p < 0.05)";
+                conclusion.className = "inline-block px-3 py-1 rounded-full text-xs font-bold bg-pink text-white shadow-sm";
                 explanation.innerHTML = `Model memiliki tingkat performa yang <strong>berbeda secara signifikan</strong>. Hipotesis nol (H0) ditolak, yang berarti perbedaan akurasi antara Model A dan Model B bukan merupakan kebetulan belaka melainkan didukung oleh bukti statistik yang kuat.`;
             } else {
-                card.className = "mcnemar-status-card not-significant text-center p-4 rounded-xl mb-4";
+                card.className = "mcnemar-status-card not-significant text-center p-4 rounded-2xl";
                 conclusion.textContent = "Tidak Signifikan (p >= 0.05)";
+                conclusion.className = "inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-mauve/20 text-dark";
                 explanation.innerHTML = `Kedua model memiliki performa yang <strong>setara secara statistik</strong>. Hipotesis nol (H0) gagal ditolak, yang berarti variasi performa di antara mereka kemungkinan besar disebabkan oleh noise sampling acak saja.`;
+            }
+
+            // Auto-scroll to Hasil Analisis Signifikansi Statistik on mobile / tablet (< 1024px)
+            if (window.innerWidth <= 1024) {
+                setTimeout(() => {
+                    const targetPanel = document.getElementById('mcnemar-result-panel-card') || document.getElementById('mcnemar-result-state');
+                    if (targetPanel) {
+                        targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 120);
             }
         } else {
             showToast(res.error || "Gagal membandingkan model.", true);
@@ -1629,8 +2101,19 @@ document.getElementById('btn-run-prediction').addEventListener('click', () => {
     .then(res => {
         if (res.success) {
             const data = res.data;
-            document.getElementById('pred-output-container').classList.remove('hidden');
-            document.getElementById('pred-label').textContent = data.label;
+            const outputContainer = document.getElementById('pred-output-container');
+            outputContainer.classList.remove('hidden');
+            outputContainer.classList.add('animate-fadeInUp');
+            setTimeout(() => outputContainer.classList.remove('animate-fadeInUp'), 500);
+            
+            const predLabelEl = document.getElementById('pred-label');
+            predLabelEl.textContent = data.label;
+            
+            // Dynamic badge color coding based on predicted sentiment
+            const lbl = String(data.label).toLowerCase();
+            const badgeClass = lbl.includes('pos') ? 'badge-success' : (lbl.includes('neg') ? 'badge-danger' : 'badge-info');
+            predLabelEl.className = `badge ${badgeClass} text-sm px-3 py-1.5 font-bold`;
+            
             document.getElementById('pred-confidence').textContent = (data.confidence * 100).toFixed(2) + "%";
             
             // Render probabilities bar chart
@@ -1642,6 +2125,53 @@ document.getElementById('btn-run-prediction').addEventListener('click', () => {
     .catch(() => showToast("Connection failed.", true))
     .finally(() => hideLoader());
 });
+
+// --- BATCH PREDICTION DRAG & DROP BINDINGS ---
+const batchDropzone = document.getElementById('batch-dropzone');
+const batchFileInput = document.getElementById('batch-file-input');
+
+if (batchDropzone && batchFileInput) {
+    batchDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        batchDropzone.classList.add('dragover');
+    });
+
+    batchDropzone.addEventListener('dragleave', () => {
+        batchDropzone.classList.remove('dragover');
+    });
+
+    batchDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        batchDropzone.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            batchFileInput.files = files;
+            updateBatchDropzoneUI(files[0]);
+        }
+    });
+
+    batchFileInput.addEventListener('change', () => {
+        if (batchFileInput.files.length > 0) {
+            updateBatchDropzoneUI(batchFileInput.files[0]);
+        }
+    });
+}
+
+function updateBatchDropzoneUI(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) {
+        showToast("Format berkas harus berekstensi .csv", true);
+        return;
+    }
+    const dropzone = document.getElementById('batch-dropzone');
+    const label = document.getElementById('batch-dropzone-label');
+    const sub = document.getElementById('batch-dropzone-sub');
+    if (dropzone) dropzone.classList.add('has-file');
+    if (label) label.innerHTML = `📄 <strong class="text-pink font-mono">${file.name}</strong>`;
+    if (sub) sub.textContent = `Ukuran: ${(file.size / 1024).toFixed(1)} KB (Klik untuk ganti file)`;
+    showToast(`File "${file.name}" siap diproses.`);
+}
 
 document.getElementById('btn-batch-prediction').addEventListener('click', () => {
     const job_id = parseInt(document.getElementById('batch-pred-model').value);
@@ -1709,21 +2239,21 @@ function fetchModelRegistry() {
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="font-bold text-xs">${model.job_id}</td>
-                        <td class="font-semibold text-dark">${model.exp_name}</td>
-                        <td><span class="badge badge-neutral">${model.model_type.toUpperCase()}</span></td>
-                        <td class="font-bold">${acc}</td>
-                        <td class="font-bold text-pink">${f1}</td>
-                        <td><code class="text-xs bg-warm-gray p-1 rounded font-mono">${model.artifact_hash.substring(0, 10)}...</code></td>
-                        <td>
-                            <select class="form-select text-xs py-1" onchange="updateModelLifecycleState(${model.job_id}, this.value)">
+                        <td data-label="Job ID" class="font-bold text-xs font-mono">#${model.job_id}</td>
+                        <td data-label="Nama Model" class="font-semibold text-dark card-header-cell">${model.exp_name}</td>
+                        <td data-label="Algoritma"><span class="badge badge-neutral">${model.model_type.toUpperCase()}</span></td>
+                        <td data-label="Akurasi" class="font-bold text-dark font-mono text-xs">${acc}</td>
+                        <td data-label="Macro F1" class="font-bold text-pink font-mono text-xs">${f1}</td>
+                        <td data-label="Hash Model"><code class="text-xs bg-warm-gray px-1.5 py-0.5 rounded font-mono">${model.artifact_hash.substring(0, 8)}...</code></td>
+                        <td data-label="Status Lifecycle">
+                            <select class="table-status-select" onchange="updateModelLifecycleState(${model.job_id}, this.value)">
                                 <option value="Active" ${optActive}>Active</option>
                                 <option value="Archived" ${optArchived}>Archived</option>
                                 <option value="Deprecated" ${optDeprecated}>Deprecated</option>
                             </select>
                         </td>
-                        <td>
-                            <div class="flex gap-1 justify-center">
+                        <td data-label="Aksi" class="card-actions-cell">
+                            <div class="flex items-center gap-1 justify-center">
                                 <a href="${downloadUrl}" class="btn btn-primary btn-sm py-1 px-2" download title="Unduh Biner PKL"><i data-lucide="download" class="w-3.5 h-3.5"></i></a>
                                 <button class="btn btn-secondary btn-sm py-1 px-2" onclick="predictModelRegistry(${model.job_id})" title="Gunakan untuk Prediksi"><i data-lucide="wand2" class="w-3.5 h-3.5"></i></button>
                                 <button class="btn btn-danger btn-sm py-1 px-2" onclick="deleteModelRegistry(${model.job_id}, '${model.exp_name}')" title="Hapus Biner Model"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -1738,7 +2268,7 @@ function fetchModelRegistry() {
 }
 
 function predictModelRegistry(jobId) {
-    location.hash = '#prediction';
+    navigateToView('prediction', true);
     setTimeout(() => {
         const select = document.getElementById('pred-model');
         if (select) {
@@ -1795,49 +2325,146 @@ function updateModelLifecycleState(jobId, state) {
 // --- GLOBAL SYNC EVENT ---
 document.getElementById('btn-sync').addEventListener('click', () => {
     showToast("Sinkronisasi data...");
-    const currentHash = window.location.hash.substring(1) || 'dashboard';
-    handleViewActivated(currentHash);
+    const currentView = getViewFromPath();
+    handleViewActivated(currentView);
 });
 
 
-// --- INITIALIZATION ---
+// --- INITIALIZATION & ROUTING ---
+// Handle Browser Back / Forward buttons
+window.addEventListener('popstate', (e) => {
+    const viewId = (e.state && e.state.view) ? e.state.view : getViewFromPath();
+    navigateToView(viewId, false);
+});
+
+// Fallback for legacy hash URLs (e.g., if navigated via #preprocess)
 window.addEventListener('hashchange', () => {
-    const viewId = window.location.hash.substring(1);
-    navigateToView(viewId);
+    if (window.location.hash) {
+        const viewId = window.location.hash.substring(1);
+        window.location.hash = '';
+        navigateToView(viewId, true);
+    }
 });
 
-// Sidebar drawer toggle on mobile sizes
-document.getElementById('sidebar-toggle').addEventListener('click', () => {
-    document.querySelector('.sidebar').classList.toggle('open');
+// Sidebar link click handling for clean SPA transitions
+document.addEventListener('click', (e) => {
+    const menuLink = e.target.closest('.sidebar-menu a.menu-item');
+    if (menuLink) {
+        e.preventDefault();
+        const href = menuLink.getAttribute('href') || '';
+        const viewId = href.replace(/^[\/#]+/, '');
+        if (viewId) {
+            navigateToView(viewId, true);
+        }
+    }
 });
+
+// Sidebar drawer toggle on mobile / mini sidebar toggle on desktop
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    if (window.innerWidth <= 768) {
+        document.querySelector('.sidebar').classList.toggle('open');
+    } else {
+        toggleDesktopSidebar();
+    }
+});
+
+// Desktop Collapsed Sidebar State Controller
+function toggleDesktopSidebar(forceState = null) {
+    const appWrapper = document.getElementById('app-wrapper');
+    if (!appWrapper) return;
+    
+    const isCurrentlyCollapsed = appWrapper.classList.contains('sidebar-collapsed');
+    const newState = forceState !== null ? forceState : !isCurrentlyCollapsed;
+    
+    if (newState) {
+        appWrapper.classList.add('sidebar-collapsed');
+        localStorage.setItem('ummu_sidebar_collapsed', 'true');
+    } else {
+        appWrapper.classList.remove('sidebar-collapsed');
+        localStorage.setItem('ummu_sidebar_collapsed', 'false');
+    }
+    
+    // Dispatch window resize event so charts / ApexCharts adapt smoothly if any
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, 320);
+}
+
+function initSidebarState() {
+    if (window.innerWidth > 768) {
+        const savedState = localStorage.getItem('ummu_sidebar_collapsed');
+        if (savedState === 'true') {
+            const appWrapper = document.getElementById('app-wrapper');
+            if (appWrapper) appWrapper.classList.add('sidebar-collapsed');
+        }
+    }
+}
+
+window.toggleDesktopSidebar = toggleDesktopSidebar;
 
 // Detect outside clicks to dismiss sidebar drawer on mobile
 document.addEventListener('click', (e) => {
     const sidebar = document.querySelector('.sidebar');
     const toggle = document.getElementById('sidebar-toggle');
-    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && !toggle.contains(e.target)) {
+    if (sidebar && toggle && window.innerWidth <= 768 && !sidebar.contains(e.target) && !toggle.contains(e.target)) {
         sidebar.classList.remove('open');
+    }
+});
+
+// Global Keyboard Accessibility (Escape key closes modals, drawers, dropdowns)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+        // 0. Close PWA Install Modal
+        const pwaModal = document.getElementById('pwa-install-modal');
+        if (pwaModal && !pwaModal.classList.contains('hidden')) {
+            hidePwaInstallModal(false);
+            return;
+        }
+        // 1. Close Info Modal
+        const infoModal = document.getElementById('preprocess-info-modal');
+        if (infoModal && !infoModal.classList.contains('hidden')) {
+            if (typeof closePreprocessInfoModal === 'function') closePreprocessInfoModal();
+            return;
+        }
+        // 2. Dismiss Confirm Modal
+        const confirmModal = document.getElementById('confirm-modal');
+        if (confirmModal && !confirmModal.classList.contains('hidden')) {
+            const cancelBtn = document.getElementById('confirm-btn-cancel');
+            if (cancelBtn) cancelBtn.click();
+            return;
+        }
+        // 3. Close open custom dropdowns
+        document.querySelectorAll('.custom-dropdown-container.is-open').forEach(c => {
+            c.classList.remove('is-open');
+            const m = c.querySelector('.custom-dropdown-menu');
+            if (m) m.classList.add('hidden');
+        });
+        // 4. Close mobile sidebar
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+        }
     }
 });
 
 // Startup Bootstrapper
 document.addEventListener('DOMContentLoaded', () => {
     // Bind click handlers for custom confirm modal
-    document.getElementById('confirm-btn-ok').addEventListener('click', () => {
+    document.getElementById('confirm-btn-ok')?.addEventListener('click', () => {
         if (confirmPromiseResolve) {
             confirmPromiseResolve(true);
             confirmPromiseResolve = null;
         }
     });
 
-    document.getElementById('confirm-btn-cancel').addEventListener('click', () => {
+    document.getElementById('confirm-btn-cancel')?.addEventListener('click', () => {
         if (confirmPromiseResolve) {
             confirmPromiseResolve(false);
             confirmPromiseResolve = null;
         }
     });
 
-    document.getElementById('confirm-modal').addEventListener('click', (e) => {
+    document.getElementById('confirm-modal')?.addEventListener('click', (e) => {
         if (e.target === document.getElementById('confirm-modal')) {
             if (confirmPromiseResolve) {
                 confirmPromiseResolve(false);
@@ -1846,7 +2473,187 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // PWA Modal backdrop click
+    document.getElementById('pwa-install-modal')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('pwa-install-modal')) {
+            hidePwaInstallModal(false);
+        }
+    });
 
-
+    initSidebarState();
     checkAuthentication();
 });
+
+// --- PWA SERVICE WORKER & AUTO INSTALL PROMPT ENGINE ---
+let deferredInstallPrompt = null;
+let pwaPromptShownThisSession = false;
+
+function checkAutoPwaInstallPrompt() {
+    if (pwaPromptShownThisSession) return;
+
+    // 1. Check if already running in standalone app mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    // 2. Check if user already installed the app
+    const isAlreadyInstalled = localStorage.getItem('ummu_pwa_installed') === 'true';
+    if (isAlreadyInstalled) return;
+
+    // 3. Check if user dismissed prompt recently (within 3 days)
+    const dismissedTimestamp = localStorage.getItem('ummu_pwa_prompt_dismissed');
+    const isDismissedRecently = dismissedTimestamp && (Date.now() - parseInt(dismissedTimestamp, 10)) < 3 * 24 * 60 * 60 * 1000;
+    if (isDismissedRecently) return;
+
+    // 4. Automatically show the minimalist install modal
+    pwaPromptShownThisSession = true;
+    setTimeout(() => {
+        showPwaInstallModal();
+    }, 700);
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    console.log('[PWA] beforeinstallprompt event captured and ready.');
+    checkAutoPwaInstallPrompt();
+});
+
+// Fallback auto-check on window load (for all browsers / first visit)
+window.addEventListener('load', () => {
+    setTimeout(checkAutoPwaInstallPrompt, 1000);
+});
+
+window.addEventListener('appinstalled', () => {
+    console.log('[PWA] Ummu NLP Lab application installed successfully!');
+    localStorage.setItem('ummu_pwa_installed', 'true');
+    deferredInstallPrompt = null;
+    hidePwaInstallModal();
+    if (typeof showToast === 'function') {
+        showToast('Aplikasi Ummu NLP Lab berhasil diinstall!');
+    }
+});
+
+function showPwaInstallModal() {
+    const modal = document.getElementById('pwa-install-modal');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.add('active');
+        if (window.lucide) lucide.createIcons();
+    }, 10);
+}
+
+function hidePwaInstallModal(rememberDismiss = false) {
+    const modal = document.getElementById('pwa-install-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 250);
+    if (rememberDismiss) {
+        localStorage.setItem('ummu_pwa_prompt_dismissed', Date.now().toString());
+    }
+}
+
+async function triggerPwaInstall() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const choiceResult = await deferredInstallPrompt.userChoice;
+        console.log('[PWA] User choice outcome:', choiceResult.outcome);
+        if (choiceResult.outcome === 'accepted') {
+            localStorage.setItem('ummu_pwa_installed', 'true');
+            if (typeof showToast === 'function') {
+                showToast('Memasang aplikasi NLP Lab ke perangkat Anda...');
+            }
+        }
+        deferredInstallPrompt = null;
+        hidePwaInstallModal();
+    } else {
+        // Fallback for desktop Chrome / Edge or when prompt already accepted
+        hidePwaInstallModal();
+        if (typeof showToast === 'function') {
+            showToast('💡 Buka menu browser (⋮) -> pilih "Install Aplikasi" atau "Tambah ke Layar Utama"');
+        }
+    }
+}
+
+// Bind PWA functions globally to window for guaranteed inline onclick execution
+window.showPwaInstallModal = showPwaInstallModal;
+window.hidePwaInstallModal = hidePwaInstallModal;
+window.triggerPwaInstall = triggerPwaInstall;
+
+// --- PWA AUTO-UPDATE ENGINE (ZERO REINSTALL REQUIRED) ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then((registration) => {
+                console.log('[PWA] Service Worker active with scope:', registration.scope);
+
+                // 1. Check for SW updates periodically (every 10 minutes)
+                setInterval(() => {
+                    registration.update().catch(() => {});
+                }, 10 * 60 * 1000);
+
+                // 2. Check for updates on tab focus / visibility change
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        registration.update().catch(() => {});
+                    }
+                });
+                window.addEventListener('focus', () => {
+                    registration.update().catch(() => {});
+                });
+
+                // 3. Detect new updates immediately when pushed
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    if (!newWorker) return;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('[PWA] New version detected! Automatically activating update...');
+                            // Instruct the new service worker to skip waiting
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    });
+                });
+            })
+            .catch((err) => {
+                console.warn('[PWA] Service Worker registration skipped/failed:', err);
+            });
+
+        // 4. Seamlessly refresh page when the new Service Worker takes over
+        let isRefreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!isRefreshing) {
+                isRefreshing = true;
+                console.log('[PWA] Service Worker updated to new version. Refreshing seamlessly...');
+                window.location.reload();
+            }
+        });
+    });
+}
+
+// --- APP LAUNCH SPLASH LOADING SCREEN CONTROLLER ---
+function hideAppSplash() {
+    const splash = document.getElementById('app-splash-screen');
+    if (splash && !splash.classList.contains('fade-out')) {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+            if (splash.parentNode) {
+                splash.parentNode.removeChild(splash);
+            }
+        }, 550);
+    }
+}
+
+window.addEventListener('load', () => {
+    setTimeout(hideAppSplash, 400);
+});
+// Fallback safety timer to ensure splash never hangs
+setTimeout(hideAppSplash, 1500);
+
+
+
+

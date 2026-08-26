@@ -1,5 +1,11 @@
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import sys
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
 import uuid
 import json
 import psutil
@@ -27,6 +33,8 @@ import pickle
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 CORS(app)
 
 # Create folders if not exists
@@ -56,9 +64,51 @@ def success_response(data=None, message=None, status_code=200):
         res["message"] = message
     return jsonify(res), status_code
 
-# --- FRONTEND ROUTE ---
+# --- PRODUCTION SECURITY HEADERS ---
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
+
+# --- STANDARD ERROR HANDLERS ---
+@app.errorhandler(404)
+def handle_not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify({"success": False, "error": "Endpoint tidak ditemukan"}), 404
+    return render_template('index.html'), 200
+
+@app.errorhandler(413)
+def handle_large_file(e):
+    return jsonify({"success": False, "error": "Ukuran berkas melebihi batas maksimum (Maks 15MB)"}), 413
+
+@app.errorhandler(500)
+def handle_server_error(e):
+    return jsonify({"success": False, "error": "Terjadi kesalahan internal server"}), 500
+
+# --- PWA & FRONTEND ROUTES (HTML5 History API Routing) ---
+@app.route('/manifest.json')
+def pwa_manifest():
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+
+@app.route('/sw.js')
+def pwa_service_worker():
+    response = send_from_directory('static/js', 'sw.js', mimetype='application/javascript')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static/img', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/')
-def index():
+@app.route('/<path:path>')
+def index(path=None):
+    if path and path.startswith(('api/', 'static/')):
+        return jsonify({"success": False, "error": "Not Found"}), 404
     return render_template('index.html')
 
 # --- AUTH API ---
@@ -972,7 +1022,6 @@ def evaluate_mcnemar():
 # --- PREDICTION LAB API ---
 @app.route('/api/v1/predict/single', methods=['POST'])
 def predict_single():
-    """Predicts text classification and confidence score using an active model."""
     data = request.json or {}
     job_id = data.get('job_id')
     text = data.get('text', '')
@@ -1000,14 +1049,16 @@ def predict_single():
 
 @app.route('/api/v1/predict/batch', methods=['POST'])
 def predict_batch():
-    """Classifies bulk lines inside an uploaded CSV file, saving results for download."""
     if 'file' not in request.files:
         return error_response("No file provided.")
     if 'job_id' not in request.form:
         return error_response("job_id is required.")
         
     file = request.files['file']
-    job_id = int(request.form['job_id'])
+    try:
+        job_id = int(request.form['job_id'])
+    except Exception:
+        return error_response("Invalid job_id.")
     
     if file.filename == '':
         return error_response("Empty file selected.")
@@ -1027,7 +1078,7 @@ def predict_batch():
         # Read batch file
         df = pd.read_csv(file)
         if 'text' not in df.columns:
-            return error_response("CSV must contain a 'text' column.")
+            return error_response("CSV file must contain a 'text' column.")
             
         # Run prediction
         predictions = []
@@ -1038,7 +1089,6 @@ def predict_batch():
             predictions.append(res['label'])
             confidences.append(res['confidence'])
             
-        # Append result columns
         df['predicted_label'] = predictions
         df['confidence_score'] = confidences
         
@@ -1048,7 +1098,6 @@ def predict_batch():
         df.to_csv(out_path, index=False)
         
         download_url = f"/static/uploads/datasets/{out_filename}"
-        
         return success_response({
             "download_url": download_url,
             "total_samples": len(df)
@@ -1056,6 +1105,15 @@ def predict_batch():
         
     except Exception as e:
         return error_response(f"Batch prediction failed: {e}")
+                    
+        return success_response({
+            "quadrant": quadrant,
+            "quadrant_label": "True Positive (TP)" if quadrant == 'TP' else ("False Positive (FP)" if quadrant == 'FP' else ("True Negative (TN)" if quadrant == 'TN' else "False Negative (FN)")),
+            "samples": samples,
+            "total_found": len(samples)
+        })
+    except Exception as e:
+        return error_response(f"Drilldown retrieval failed: {e}")
 
 
 # --- MODEL REGISTRY API ---
@@ -1264,9 +1322,8 @@ def get_system_resources():
 
 
 
-# Initialize Database and Start Server
 if __name__ == '__main__':
     # Initialize DB schema
     init_db()
-    print("Flask server starting on port:", PORT)
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    print(f"Flask server starting on http://127.0.0.1:{PORT}")
+    app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)

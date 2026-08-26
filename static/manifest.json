@@ -1,0 +1,57 @@
+{
+  "name": "Ummu NLP Lab",
+  "short_name": "Ummu NLP Lab",
+  "description": "Platform Penelitian Komparasi Algoritma Klasifikasi Teks dan Analisis Sentimen Bahasa Indonesia",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFF0F5",
+  "theme_color": "#FFF0F5",
+  "orientation": "portrait-primary",
+  "lang": "id-ID",
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/static/img/favicon-32.png?v=75.0",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/favicon-48.png?v=75.0",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/favicon-64.png?v=75.0",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/favicon-128.png?v=75.0",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/pwa-icon-192.png?v=75.0",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/img/pwa-icon-512.png?v=75.0",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/img/pwa-icon-maskable.png?v=75.0",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

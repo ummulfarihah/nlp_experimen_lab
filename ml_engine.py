@@ -12,18 +12,18 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix, classification_report
 
-# Indonesian Stopwords List (standard, compiled for high performance)
+# Indonesian Stopwords List (Selective Stopwords - Negation words preserved for Sentiment Analysis)
 INDONESIAN_STOPWORDS = set([
     'yang', 'di', 'dan', 'itu', 'dengan', 'untuk', 'dari', 'ke', 'ini', 'adalah',
     'bisa', 'ada', 'pada', 'juga', 'saya', 'kami', 'mereka', 'dia', 'anda', 'kamu',
     'akan', 'telah', 'sudah', 'sedang', 'dalam', 'oleh', 'olehnya', 'atau', 'tetapi',
     'namun', 'hanya', 'saja', 'jika', 'kalau', 'karena', 'sehingga', 'maka', 'tentang',
-    'seperti', 'seperti', 'terhadap', 'secara', 'kembali', 'kemudian', 'lalu', 'setelah',
-    'sebelum', 'ketika', 'saat', 'sementara', 'bagi', 'bagi', 'bagi', 'sangat', 'amat',
-    'paling', 'lebih', 'kurang', 'sangat', 'terlalu', 'banyak', 'beberapa', 'semua',
-    'tiap', 'setiap', 'bukan', 'tidak', 'tak', 'belum', 'jangan', 'bagaimana', 'apa',
-    'siapa', 'dimana', 'kapan', 'mengapa', 'kenapa', 'bagaimana', 'ya', 'tidak', 'oh',
-    'sih', 'lah', 'deh', 'kah', 'pun', 'kok', 'punya', 'punya', 'buat', 'adalah', 'ialah'
+    'seperti', 'terhadap', 'secara', 'kembali', 'kemudian', 'lalu', 'setelah',
+    'sebelum', 'ketika', 'saat', 'sementara', 'bagi', 'sangat', 'amat',
+    'paling', 'lebih', 'terlalu', 'banyak', 'beberapa', 'semua',
+    'tiap', 'setiap', 'bagaimana', 'apa',
+    'siapa', 'dimana', 'kapan', 'mengapa', 'kenapa', 'ya', 'oh',
+    'sih', 'lah', 'deh', 'kah', 'pun', 'kok', 'punya', 'buat', 'ialah'
 ])
 
 # Indonesian Slang Words / Informal Words mapping (Slang Words Normalization)
@@ -37,8 +37,8 @@ SLANG_WORDS_DICT = {
 }
 
 def preprocess_text_step_by_step(text):
-    """Processes a text and returns steps: Raw, Case Folded, Tokenized, Stopwords Removed.
-    Note: Stemming has been removed from the pipeline."""
+    """Processes a text and returns steps: Raw, Case Folded, Tokenized & Normalized, Stopwords Removed.
+    Note: Selective stopwords removal preserves negation words."""
     # Step 1: Case Folding
     case_folded = text.lower()
     
@@ -50,7 +50,7 @@ def preprocess_text_step_by_step(text):
     tokens = re.findall(r'\b[a-zA-Z0-9]+\b', clean_text)
     normalized_tokens = [SLANG_WORDS_DICT.get(tok, tok) for tok in tokens]
     
-    # Step 3: Stopword Removal (Selective)
+    # Step 3: Stopword Removal (Selective - Negation words preserved)
     filtered_tokens = [tok for tok in normalized_tokens if tok not in INDONESIAN_STOPWORDS]
     
     # Final processed text (no stemming)
@@ -59,7 +59,7 @@ def preprocess_text_step_by_step(text):
     return {
         "raw": text,
         "case_folded": case_folded,
-        "tokens": tokens,
+        "tokens": normalized_tokens,
         "filtered_tokens": filtered_tokens,
         "processed": processed_text
     }
