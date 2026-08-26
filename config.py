@@ -62,6 +62,17 @@ else:
         SECRET_KEY: str = _RAW_SECRET_KEY
 
 GOOGLE_CLIENT_ID: str = os.getenv('GOOGLE_CLIENT_ID', '913045747684-3csh1li78d5isiprhph251rguof4nmln.apps.googleusercontent.com')
+
+# Google OAuth & Email Whitelist Security Check
+_RAW_WHITELIST = os.getenv('GOOGLE_AUTH_WHITELIST') or os.getenv('ALLOWED_GOOGLE_EMAILS')
+if _RAW_WHITELIST:
+    ALLOWED_EMAILS = [email.strip().lower() for email in _RAW_WHITELIST.split(',') if email.strip()]
+else:
+    ALLOWED_EMAILS = [
+        "ummulfarihah20@gmail.com",
+        "khamalade@gmail.com"
+    ]
+
 MAX_CONTENT_LENGTH: int = int(os.getenv('MAX_CONTENT_LENGTH', str(15 * 1024 * 1024)))  # 15 MB
 
 # CORS Allowed Origins

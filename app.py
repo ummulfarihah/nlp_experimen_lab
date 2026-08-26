@@ -20,7 +20,7 @@ from config import (
     resolve_db_path, setup_logging,
     BASE_DIR, UPLOAD_FOLDER, DATASETS_FOLDER, MODELS_FOLDER, LOGS_FOLDER, AVATARS_FOLDER,
     SQLALCHEMY_DATABASE_URI, GOOGLE_CLIENT_ID, SECRET_KEY, PORT, MAX_CONTENT_LENGTH,
-    DEBUG, ALLOWED_ORIGINS, FLASK_ENV
+    DEBUG, ALLOWED_ORIGINS, FLASK_ENV, ALLOWED_EMAILS
 )
 from database import db_read, db_session, init_db, hash_password, verify_password
 from ml_engine import (
@@ -240,8 +240,29 @@ def auth_google():
     if not user_info or not user_info.get('email'):
         return error_response("Token Google tidak valid atau gagal diverifikasi.", 401)
         
+    google_email = user_info['email'].strip().lower()
+    
+    # -------------------------------------------------------------
+    # EMAIL WHITELIST SECURITY CHECK
+    # -------------------------------------------------------------
+    is_whitelisted = google_email in [e.lower() for e in ALLOWED_EMAILS]
+    
+    # Check if the email already exists in the database as an authorized user
+    if not is_whitelisted:
+        with db_read() as conn:
+            existing_user = conn.execute('SELECT id FROM users WHERE LOWER(email) = ?', (google_email,)).fetchone()
+            if existing_user:
+                is_whitelisted = True
+                
+    if not is_whitelisted:
+        logger.warning(f"[ACCESS DENIED] Google login attempt from non-whitelisted email: {google_email}")
+        return error_response(
+            f"Akses ditolak. Akun Google ({google_email}) tidak terdaftar dalam whitelist resmi Ummu NLP Lab. Silakan hubungi Administrator.",
+            403
+        )
+        
     with db_session() as cursor:
-        cursor.execute('SELECT * FROM users WHERE email = ?', (user_info['email'],))
+        cursor.execute('SELECT * FROM users WHERE LOWER(email) = ?', (google_email,))
         db_user = cursor.fetchone()
         if not db_user:
             cursor.execute('''

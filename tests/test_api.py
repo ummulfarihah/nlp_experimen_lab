@@ -190,3 +190,37 @@ def test_stale_job_recovery_on_init():
         assert job["status"] == "Failed"
         assert "Interrupted by server restart" in job["failure_reason"]
         cursor.execute("DELETE FROM experiment_jobs WHERE id = ?", (stale_job_id,))
+
+
+def test_google_auth_non_whitelisted_denied(client):
+    """Verifies that non-whitelisted Google emails are rejected with 403."""
+    import base64
+    payload = base64.urlsafe_b64encode(json.dumps({
+        "email": "unauthorized_stranger@gmail.com",
+        "name": "Stranger",
+        "picture": ""
+    }).encode()).decode().rstrip('=')
+    fake_token = f"header.{payload}.sig"
+    
+    res = client.post('/api/v1/auth/google', json={"credential": fake_token})
+    assert res.status_code == 403
+    data = json.loads(res.data)
+    assert data["success"] is False
+    assert "tidak terdaftar dalam whitelist" in data["error"]
+
+
+def test_google_auth_whitelisted_allowed(client):
+    """Verifies that whitelisted Google emails are permitted to login."""
+    import base64
+    payload = base64.urlsafe_b64encode(json.dumps({
+        "email": "ummulfarihah20@gmail.com",
+        "name": "Ummul Farihah",
+        "picture": "https://lh3.googleusercontent.com/test-avatar.jpg"
+    }).encode()).decode().rstrip('=')
+    fake_token = f"header.{payload}.sig"
+    
+    res = client.post('/api/v1/auth/google', json={"credential": fake_token})
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["success"] is True
+    assert data["data"]["email"] == "ummulfarihah20@gmail.com"
