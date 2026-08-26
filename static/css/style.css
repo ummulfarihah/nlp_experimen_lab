@@ -5857,6 +5857,56 @@ select.form-select option:disabled,
 }
 
 /* ==========================================================================
+   GOOGLE OAUTH SIGN-IN BUTTON STYLING (PROPORTIONAL GLASSMORPHISM)
+   ========================================================================== */
+.btn-google-login {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 16px !important;
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(255, 123, 167, 0.28) !important;
+    border-radius: 9999px !important;
+    color: var(--dark, #2D3748) !important;
+    font-family: inherit !important;
+    font-size: 0.8125rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+    text-decoration: none !important;
+}
+
+.btn-google-login:hover {
+    background: #FFFFFF !important;
+    border-color: rgba(255, 123, 167, 0.6) !important;
+    box-shadow: 0 4px 12px rgba(255, 123, 167, 0.18) !important;
+    transform: translateY(-1px) !important;
+}
+
+.btn-google-login:active {
+    transform: scale(0.98) !important;
+}
+
+.google-svg-icon {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
    ACCESSIBILITY: PREFERS-REDUCED-MOTION (WCAG 2.1 AAA Standard)
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
