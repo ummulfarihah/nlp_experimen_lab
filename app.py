@@ -176,7 +176,7 @@ def auth_google():
     credential = data.get('credential') or data.get('access_token') or data.get('id_token')
     
     if not credential:
-        return error_response("Token credential is required.")
+        return error_response("Token kredensial Google wajib diisi.")
         
     user_info = None
     
@@ -269,7 +269,7 @@ def auth_google():
     
     session['user'] = user_session
     logger.info(f"User logged in successfully via Google: {user_session['email']}")
-    return success_response(user_session, "Google Login Successful")
+    return success_response(user_session, "Login Google berhasil.")
 
 @app.route('/api/v1/auth/login', methods=['POST'])
 def email_login():
@@ -279,7 +279,7 @@ def email_login():
     password = data.get('password', '')
     
     if not email or not password:
-        return error_response("Email and password are required.")
+        return error_response("Email dan kata sandi wajib diisi.")
         
     with db_read() as conn:
         user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
@@ -295,15 +295,15 @@ def email_login():
         }
         session['user'] = user_info
         logger.info(f"Successful login for user {email}")
-        return success_response(user_info, "Login Successful")
+        return success_response(user_info, "Login berhasil.")
     else:
         logger.warning(f"Failed login attempt for email: {email}")
-        return error_response("Email atau Kata Sandi administrator salah.", 401)
+        return error_response("Email atau kata sandi administrator salah.", 401)
 
 @app.route('/api/v1/auth/logout', methods=['POST'])
 def logout():
     session.pop('user', None)
-    return success_response(message="Logged out successfully")
+    return success_response(message="Berhasil keluar dari sistem.")
 
 @app.route('/api/v1/auth/me', methods=['GET'])
 def current_user():
@@ -323,7 +323,7 @@ def current_user():
             session['user'] = user_info
             return success_response(user_info)
         return success_response(user)
-    return error_response("Unauthorized", 401)
+    return error_response("Sesi belum terautentikasi.", 401)
 
 @app.route('/api/v1/auth/profile', methods=['POST'])
 @login_required
@@ -454,7 +454,7 @@ def get_datasets():
 def upload_dataset():
     """Handles CSV dataset file uploads, checks format, hashes, and records stats."""
     if 'file' not in request.files:
-        return error_response("No file provided.")
+        return error_response("Tidak ada berkas yang dikirim.")
         
     file = request.files['file']
     raw_name = file.filename or ''
@@ -488,7 +488,7 @@ def upload_dataset():
                 os.remove(save_path) # remove redundant file
                 row = dict(existing)
                 row['class_distribution'] = json.loads(row['class_distribution'])
-                return success_response(row, "Dataset already exists. Loaded existing index.")
+                return success_response(row, "Dataset sudah ada. Memuat indeks yang telah tersedia.")
                 
             # Write to database
             cursor.execute('''
@@ -513,13 +513,13 @@ def upload_dataset():
             "class_distribution": class_dist,
             "uploaded_at": datetime.now().isoformat()
         }
-        return success_response(data_record, "Dataset uploaded and analyzed successfully.")
+        return success_response(data_record, "Dataset berhasil diunggah dan dianalisis.")
         
     except Exception as e:
         # Delete invalid file
         if os.path.exists(save_path):
             os.remove(save_path)
-        return error_response(f"Invalid dataset structure: {str(e)}")
+        return error_response(f"Struktur dataset tidak valid: {str(e)}")
 
 @app.route('/api/v1/datasets/<int:id>', methods=['DELETE'])
 @login_required
@@ -589,14 +589,14 @@ def dataset_preview(id):
         dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (id,)).fetchone()
     
     if not dataset:
-        return error_response("Dataset not found.", 404)
+        return error_response("Dataset tidak ditemukan.", 404)
         
     try:
         df = pd.read_csv(dataset['filepath'])
         preview_data = df.head(10).fillna('').to_dict(orient='records')
         return success_response(preview_data)
     except Exception as e:
-        return error_response(f"Failed to load dataset: {e}")
+        return error_response(f"Gagal memuat dataset: {e}")
 
 
 # --- PREPROCESSING LAB API ---
@@ -608,13 +608,13 @@ def interactive_preprocess():
     text = data.get('text', '')
     
     if not text.strip():
-        return error_response("Text input cannot be empty.")
+        return error_response("Teks masukan tidak boleh kosong.")
         
     try:
         steps = preprocess_text_step_by_step(text)
         return success_response(steps)
     except Exception as e:
-        return error_response(f"Preprocessing error: {e}")
+        return error_response(f"Terjadi kesalahan prapemrosesan: {e}")
 
 
 @app.route('/api/v1/preprocess/bert', methods=['POST'])
@@ -625,13 +625,13 @@ def interactive_preprocess_bert():
     text = data.get('text', '')
     
     if not text.strip():
-        return error_response("Text input cannot be empty.")
+        return error_response("Teks masukan tidak boleh kosong.")
         
     try:
         steps = preprocess_bert_step_by_step(text)
         return success_response(steps)
     except Exception as e:
-        return error_response(f"BERT Preprocessing error: {e}")
+        return error_response(f"Terjadi kesalahan prapemrosesan BERT: {e}")
 
 
 # --- EXPERIMENTS & TRAINING API ---
@@ -648,7 +648,7 @@ def run_experiment():
     split_config = data.get('split_config')
     
     if not name or not dataset_id or not model_type:
-        return error_response("Name, dataset_id, and model_type are required.")
+        return error_response("Nama eksperimen, ID dataset, dan tipe model wajib diisi.")
         
     # Validate split_config
     if not split_config:
@@ -661,31 +661,31 @@ def run_experiment():
         if method == "external":
             test_dataset_id = split_config.get("test_dataset_id")
             if not test_dataset_id:
-                return error_response("test_dataset_id is required for external split method.")
+                return error_response("ID dataset uji (test_dataset_id) wajib diisi untuk metode pemisahan eksternal.")
             with db_read() as conn:
                 test_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (test_dataset_id,)).fetchone()
                 if not test_dataset:
-                    return error_response(f"External test dataset with ID {test_dataset_id} not found.", 404)
+                    return error_response(f"Dataset uji eksternal dengan ID {test_dataset_id} tidak ditemukan.", 404)
                     
                 val_dataset_id = split_config.get("val_dataset_id")
                 if val_dataset_id:
                     val_dataset = conn.execute('SELECT * FROM datasets WHERE id = ?', (val_dataset_id,)).fetchone()
                     if not val_dataset:
-                        return error_response(f"External validation dataset with ID {val_dataset_id} not found.", 404)
+                        return error_response(f"Dataset validasi eksternal dengan ID {val_dataset_id} tidak ditemukan.", 404)
         else:
             try:
                 test_size = float(split_config.get("test_size", 0.2))
                 if not (0.0 < test_size < 1.0):
-                    return error_response("test_size must be a float between 0.0 and 1.0 (exclusive).")
+                    return error_response("Ukuran data uji (test_size) harus berupa angka desimal antara 0.0 dan 1.0.")
             except (ValueError, TypeError):
-                return error_response("test_size must be a valid float.")
+                return error_response("Ukuran data uji (test_size) harus berupa angka desimal yang valid.")
         
     try:
         with db_session() as cursor:
             cursor.execute('SELECT * FROM datasets WHERE id = ?', (dataset_id,))
             dataset = cursor.fetchone()
             if not dataset:
-                return error_response("Dataset not found.", 404)
+                return error_response("Dataset tidak ditemukan.", 404)
 
             # 1. Insert Model Config
             cursor.execute('''
@@ -726,10 +726,10 @@ def run_experiment():
         with db_session() as cursor2:
             cursor2.execute('UPDATE experiment_jobs SET celery_task_id = ? WHERE id = ?', (str(thread_id), job_id))
         
-        return success_response({"job_id": job_id}, f"Experiment launched successfully. Running background Job ID: {job_id}")
+        return success_response({"job_id": job_id}, f"Eksperimen berhasil diluncurkan. Menjalankan Job ID: {job_id}")
         
     except Exception as e:
-        return error_response(f"Failed to launch experiment: {e}")
+        return error_response(f"Gagal meluncurkan eksperimen: {e}")
 
 @app.route('/api/v1/experiments/jobs', methods=['GET'])
 @login_required
@@ -770,7 +770,7 @@ def get_job(id):
         ''', (id,)).fetchone()
         
         if not job:
-            return error_response("Job not found.", 404)
+            return error_response("Pekerjaan training tidak ditemukan.", 404)
             
         job_dict = dict(job)
         job_dict['parameters'] = json.loads(job_dict['parameters'])
@@ -855,7 +855,7 @@ def cancel_job_endpoint(id):
     """Triggers background thread cancellation for a running job."""
     cancelled = cancel_training_job(id)
     if cancelled:
-        return success_response(message=f"Job {id} cancellation signal dispatched.")
+        return success_response(message=f"Sinyal pembatalan untuk Job {id} berhasil dikirim.")
         
     # If not actively running in-memory, check if it's a zombie active job in DB
     try:
@@ -866,17 +866,17 @@ def cancel_job_endpoint(id):
                 # Safe recovery: update database status to Cancelled
                 cursor.execute('''
                     UPDATE experiment_jobs 
-                    SET status = 'Cancelled', completed_at = ?, failure_reason = 'Stale job cancelled after server restart.' 
+                    SET status = 'Cancelled', completed_at = ?, failure_reason = 'Pekerjaan usang dibatalkan setelah server dimulai ulang.' 
                     WHERE id = ?
                 ''', (datetime.now().isoformat(), id))
                 
                 # Log the recovery event
                 db_log_event(id, "WARNING", "ZOMBIE_RECOVERY", "Zombie/stale training job safely recovered and marked as Cancelled.")
-                return success_response(message=f"Zombie Job {id} safely recovered and marked as Cancelled.")
+                return success_response(message=f"Pekerjaan usang Job {id} berhasil dipulihkan dan ditandai sebagai Dibatalkan.")
     except Exception as e:
         logger.warning(f"Error recovering zombie job {id}: {e}")
             
-    return error_response("Job is not actively running or cannot be cancelled.")
+    return error_response("Pekerjaan tidak sedang berjalan aktif atau tidak dapat dibatalkan.")
 
 @app.route('/api/v1/experiments/jobs/<int:id>/logs', methods=['GET'])
 @login_required
@@ -884,7 +884,7 @@ def get_job_logs(id):
     """Reads the raw task logger text file line-by-line."""
     log_path = create_job_log_file_path(id)
     if not os.path.exists(log_path):
-        return success_response([], "No logs recorded yet.")
+        return success_response([], "Belum ada catatan log.")
         
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
@@ -914,7 +914,7 @@ def get_job_logs(id):
                 })
         return success_response(parsed_logs)
     except Exception as e:
-        return error_response(f"Failed to read logs: {e}")
+        return error_response(f"Gagal membaca log: {e}")
 
 
 # --- EVALUATIONS & STATISTICAL COMPARISONS API ---
@@ -952,10 +952,10 @@ def evaluate_mcnemar():
     model_b_id = data.get('model_b_job_id')
     
     if not model_a_id or not model_b_id:
-        return error_response("Both model_a_job_id and model_b_job_id are required.")
+        return error_response("ID model A dan model B wajib diisi.")
         
     if model_a_id == model_b_id:
-        return error_response("You must select two different models to compare.")
+        return error_response("Anda harus memilih dua model yang berbeda untuk dibandingkan.")
         
     try:
         with db_read() as conn:
@@ -964,7 +964,7 @@ def evaluate_mcnemar():
             job_b = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (model_b_id,)).fetchone()
             
             if not job_a or not job_b:
-                return error_response("Both models must be in Completed state.", 400)
+                return error_response("Kedua model harus berstatus Selesai (Completed).", 400)
                 
             # Try to read pre-computed predictions from SQLite evaluations table first
             eval_a = conn.execute('SELECT y_test, y_pred FROM evaluations WHERE experiment_job_id = ?', (model_a_id,)).fetchone()
@@ -1064,11 +1064,11 @@ def evaluate_mcnemar():
             "model_a_id": model_a_id,
             "model_b_id": model_b_id
         }
-        return success_response(result_payload, "McNemar significance testing computed successfully.")
+        return success_response(result_payload, "Uji signifikansi McNemar berhasil dihitung.")
         
     except Exception as e:
         logger.error(f"Statistical evaluation failed: {e}")
-        return error_response(f"Statistical evaluation failed: {e}")
+        return error_response(f"Evaluasi statistik gagal: {e}")
 
 
 # --- PREDICTION LAB API ---
@@ -1080,13 +1080,13 @@ def predict_single():
     text = data.get('text', '')
     
     if not job_id or not text.strip():
-        return error_response("Both job_id and text are required.")
+        return error_response("ID pekerjaan dan teks wajib diisi.")
         
     with db_read() as conn:
         job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
     
     if not job:
-        return error_response("Completed model artifact not found.", 404)
+        return error_response("Artefak model yang selesai tidak ditemukan.", 404)
         
     try:
         artifact_path = resolve_db_path(job['model_artifact_path'])
@@ -1096,30 +1096,30 @@ def predict_single():
         
     except Exception as e:
         logger.error(f"Single prediction error: {e}")
-        return error_response(f"Prediction failed: {e}")
+        return error_response(f"Prediksi gagal: {e}")
 
 @app.route('/api/v1/predict/batch', methods=['POST'])
 @login_required
 def predict_batch():
     if 'file' not in request.files:
-        return error_response("No file provided.")
+        return error_response("Tidak ada berkas yang dikirim.")
     if 'job_id' not in request.form:
-        return error_response("job_id is required.")
+        return error_response("ID pekerjaan (job_id) wajib diisi.")
         
     file = request.files['file']
     try:
         job_id = int(request.form['job_id'])
     except Exception:
-        return error_response("Invalid job_id.")
+        return error_response("ID pekerjaan tidak valid.")
     
     if file.filename == '':
-        return error_response("Empty file selected.")
+        return error_response("Berkas yang dipilih kosong.")
         
     with db_read() as conn:
         job = conn.execute('SELECT * FROM experiment_jobs WHERE id = ? AND status = "Completed"', (job_id,)).fetchone()
     
     if not job:
-        return error_response("Completed model artifact not found.", 404)
+        return error_response("Artefak model yang selesai tidak ditemukan.", 404)
         
     try:
         artifact_path = resolve_db_path(job['model_artifact_path'])
@@ -1133,7 +1133,7 @@ def predict_batch():
             df = pd.read_csv(file, encoding='latin-1')
 
         if 'text' not in df.columns:
-            return error_response("CSV file must contain a 'text' column.")
+            return error_response("Berkas CSV harus memiliki kolom 'text'.")
 
         if len(df) > 5000:
             return error_response("Ukuran berkas batch maksimal 5.000 baris per transaksi.")
@@ -1159,11 +1159,11 @@ def predict_batch():
         return success_response({
             "download_url": download_url,
             "total_samples": len(df)
-        }, "Batch prediction completed successfully.")
+        }, "Prediksi batch berhasil diselesaikan.")
         
     except Exception as e:
         logger.error(f"Batch prediction failed: {e}")
-        return error_response(f"Batch prediction failed: {e}")
+        return error_response(f"Prediksi batch gagal: {e}")
 
 
 # --- MODEL REGISTRY API ---
@@ -1241,7 +1241,7 @@ def update_model_lifecycle(job_id):
     new_lifecycle = data.get('lifecycle') # 'Active', 'Archived', 'Deprecated'
     
     if new_lifecycle not in ['Active', 'Archived', 'Deprecated']:
-        return error_response("Invalid lifecycle state. Must be 'Active', 'Archived', or 'Deprecated'.")
+        return error_response("Status siklus hidup tidak valid. Harus 'Active', 'Archived', atau 'Deprecated'.")
         
     with db_session() as cursor:
         cursor.execute('SELECT * FROM experiment_jobs WHERE id = ?', (job_id,))
@@ -1252,7 +1252,7 @@ def update_model_lifecycle(job_id):
             
         cursor.execute('UPDATE experiment_jobs SET artifact_lifecycle = ? WHERE id = ?', (new_lifecycle, job_id))
     
-    return success_response(message=f"Model job {job_id} lifecycle set to '{new_lifecycle}'.")
+    return success_response(message=f"Status siklus hidup model job {job_id} berhasil diubah menjadi '{new_lifecycle}'.")
 
 
 @app.route('/api/v1/system/toggle_mock_gpu', methods=['POST'])
@@ -1261,7 +1261,7 @@ def toggle_mock_gpu():
     """Toggles local high-fidelity GPU monitoring simulation."""
     global MOCK_GPU_ENABLED
     MOCK_GPU_ENABLED = not MOCK_GPU_ENABLED
-    return success_response({"mock_gpu_enabled": MOCK_GPU_ENABLED}, f"GPU Simulation set to {MOCK_GPU_ENABLED}")
+    return success_response({"mock_gpu_enabled": MOCK_GPU_ENABLED}, f"Simulasi GPU diatur ke {MOCK_GPU_ENABLED}")
 
 
 # --- RESOURCE MONITOR API ---

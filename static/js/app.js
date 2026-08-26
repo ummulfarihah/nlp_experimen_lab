@@ -788,7 +788,7 @@ function fetchSystemResources() {
                 } else {
                     // GPU tidak tersedia / Fallback status
                     updateResourceChart('gpu', 0);
-                    document.getElementById('dash-gpu-meta').textContent = "Running on Host Hypervisor Thread";
+                    document.getElementById('dash-gpu-meta').textContent = "Berjalan pada Thread Hypervisor Host";
                     document.getElementById('dash-device-name').textContent = "GPU tidak tersedia";
                 }
             }
@@ -829,7 +829,7 @@ function fetchDashboardSummary() {
                 list.innerHTML = '';
                 
                 if (jobs.length === 0) {
-                    list.innerHTML = '<div class="text-center py-6 text-rose-mauve text-xs">Belum ada eksperimen dilaunching.</div>';
+                    list.innerHTML = '<div class="text-center py-6 text-rose-mauve text-xs">Belum ada eksperimen diluncurkan.</div>';
                     return;
                 }
                 
@@ -1113,7 +1113,7 @@ const STEP_INFO_DETAILS = {
         subtitle: "Segmentasi Kata & Normalisasi Kata Gaul",
         icon: "book-open",
         badge: "Normalisasi Kamus",
-        description: "Memecah untaian teks menjadi daftar kata tunggal (<em>unigram tokens</em>), kemudian memetakan setiap kata gaul/singkatan ke bentuk baku Bahasa Indonesia berdasarkan kamus slang (misal: <code>bgt</code> &rarr; <code>sangat</code>, <code>sy</code> &rarr; <code>saya</code>, <code>sm</code> &rarr; <code>sama</code>, <code>udh</code> &rarr; <code>sudah</code>, <code>krn</code> &rarr; <code>karena</code>).",
+        description: "Memecah untaian teks menjadi daftar kata tunggal (<em>unigram tokens</em>), kemudian memetakan setiap kata gaul/singkatan ke bentuk baku bahasa Indonesia berdasarkan kamus slang (misal: <code>bgt</code> &rarr; <code>sangat</code>, <code>sy</code> &rarr; <code>saya</code>, <code>sm</code> &rarr; <code>sama</code>, <code>udh</code> &rarr; <code>sudah</code>, <code>krn</code> &rarr; <code>karena</code>).",
         role: "Meningkatkan kecocokan fitur teks dengan korpus pelatihan (<em>training vocabulary</em>) dan mencegah kata informal menjadi kata yang tidak dikenali.",
         comparison: "Dilakukan pada kedua pipeline agar kata-kata informal dapat dikenali oleh model statistik maupun transformer."
     },
@@ -1158,7 +1158,7 @@ const STEP_INFO_DETAILS = {
         subtitle: "Teks Masukan Lengkap Siap Tokenisasi",
         icon: "badge-check",
         badge: "Konteks Utuh",
-        description: "Kalimat hasil normalisasi minimal yang masih memiliki tata bahasa dan struktur kalimat lengkap Bahasa Indonesia.",
+        description: "Kalimat hasil normalisasi minimal yang masih memiliki tata bahasa dan struktur kalimat lengkap bahasa Indonesia.",
         role: "Diumpankan secara langsung ke modul <code>BertTokenizer</code> berbasis WordPiece.",
         comparison: "Memiliki jumlah kata yang lebih lengkap dibandingkan output tahap 4 model klasik."
     },
@@ -1168,7 +1168,7 @@ const STEP_INFO_DETAILS = {
         icon: "layers",
         badge: "Subword Splitting",
         description: "Algoritma WordPiece memecah kata menjadi unit subkata (<em>subword tokens</em>) yang ditandai prefiks <code>##</code> jika kata tidak ada dalam kamus. Ditambahkan token khusus <code>[CLS]</code> di awal (agregator representasi sentimen) dan <code>[SEP]</code> di akhir kalimat.",
-        role: "Menghilangkan permasalahan kata di luar kamus (<em>Out-Of-Vocabulary / OOV</em>), khususnya untuk kata-kata berafiks/berimbuhan kompleks khas Bahasa Indonesia (misal: <em>menakjubkan</em> &rarr; <code>menak</code>, <code>##jub</code>, <code>##kan</code>).",
+        role: "Menghilangkan permasalahan kata di luar kamus (<em>Out-Of-Vocabulary / OOV</em>), khususnya untuk kata-kata berafiks/berimbuhan kompleks khas bahasa Indonesia (misal: <em>menakjubkan</em> &rarr; <code>menak</code>, <code>##jub</code>, <code>##kan</code>).",
         comparison: "Model klasik menggunakan token kata utuh (<em>word-level</em>). IndoBERT menggunakan token subkata (<em>subword-level</em>)."
     },
     'bert-4': {
@@ -2317,7 +2317,7 @@ document.getElementById('form-mcnemar').addEventListener('submit', (e) => {
             showToast(res.error || "Gagal membandingkan model.", true);
         }
     })
-    .catch(() => showToast("Connection failed.", true))
+    .catch(() => showToast("Koneksi ke server gagal.", true))
     .finally(() => hideLoader());
 });
 
@@ -2367,7 +2367,7 @@ document.getElementById('btn-run-prediction').addEventListener('click', () => {
             showToast(res.error || "Gagal menjalankan prediksi.", true);
         }
     })
-    .catch(() => showToast("Connection failed.", true))
+    .catch(() => showToast("Koneksi ke server gagal.", true))
     .finally(() => hideLoader());
 });
 
@@ -2453,7 +2453,7 @@ document.getElementById('btn-batch-prediction').addEventListener('click', () => 
             showToast(res.error || "Batch prediksi gagal.", true);
         }
     })
-    .catch(() => showToast("Connection failure.", true))
+    .catch(() => showToast("Koneksi ke server gagal.", true))
     .finally(() => hideLoader());
 });
 
@@ -2894,7 +2894,7 @@ window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
     hidePwaInstallModal();
     if (typeof showToast === 'function') {
-        showToast('Aplikasi Ummu NLP Lab berhasil diinstall!');
+        showToast('Aplikasi Ummu NLP Lab berhasil diinstal!');
     }
 });
 

@@ -306,7 +306,7 @@ function renderModelComparisons(models) {
     
     const options = {
         series: [
-            { name: 'Accuracy (%)', data: accuracies },
+            { name: 'Akurasi (%)', data: accuracies },
             { name: 'Macro F1 (%)', data: f1s }
         ],
         chart: {
@@ -442,7 +442,7 @@ function renderPredictionProbabilities(probMap) {
     
     const options = {
         series: [{
-            name: 'Probability (%)',
+            name: 'Probabilitas (%)',
             data: probabilities
         }],
         chart: {
