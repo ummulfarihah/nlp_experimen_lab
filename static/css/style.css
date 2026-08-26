@@ -3091,9 +3091,9 @@ select.form-select option:disabled,
 .confirm-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(255, 240, 245, 0.45);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(45, 34, 48, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3101,6 +3101,8 @@ select.form-select option:disabled,
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-speed) ease;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 .confirm-modal-overlay.active {
@@ -3109,19 +3111,25 @@ select.form-select option:disabled,
 }
 
 .confirm-modal-box {
-    background: rgba(255, 255, 255, 0.96);
-    border: 1px solid rgba(255, 123, 167, 0.25);
-    width: 90%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1.5px solid rgba(255, 123, 167, 0.35);
+    width: 100%;
     max-width: 440px;
-    border-radius: var(--border-radius);
-    padding: 24px;
-    box-shadow: 0 20px 50px rgba(255, 123, 167, 0.12);
-    transform: scale(0.92);
-    transition: transform var(--transition-speed) cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 28px;
+    padding: 28px 28px 24px 28px;
+    box-shadow: 0 24px 60px -12px rgba(255, 123, 167, 0.25), 0 12px 28px rgba(45, 34, 48, 0.08);
+    transform: scale(0.92) translateY(12px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    box-sizing: border-box;
 }
 
 .confirm-modal-overlay.active .confirm-modal-box {
-    transform: scale(1);
+    transform: scale(1) translateY(0);
+    opacity: 1;
 }
 
 /* APEXCHARTS HOVER TOOLTIP (LIGHT THEME & MOBILE OPTIMIZED) */
@@ -3553,67 +3561,136 @@ select.form-select option:disabled,
 .confirm-modal-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1.5px solid rgba(255, 123, 167, 0.18);
+}
+
+.confirm-modal-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .confirm-modal-icon-bg {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background-color: #fff1f0;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #FFF1F0 0%, #FFE4EE 100%);
+    border: 1.5px solid rgba(224, 90, 71, 0.28);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-shadow: 0 6px 18px rgba(224, 90, 71, 0.15);
+}
+
+.confirm-modal-icon-bg.is-alert {
+    background: linear-gradient(135deg, #FFF0F5 0%, #FFD6E7 100%);
+    border-color: rgba(255, 123, 167, 0.4);
+    box-shadow: 0 6px 18px rgba(255, 123, 167, 0.2);
 }
 
 .confirm-modal-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--text-dark);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-dark, #2D3748);
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin: 0;
 }
 
 .confirm-modal-body {
-    margin-bottom: 24px;
+    margin-bottom: 22px;
 }
 
 .confirm-modal-message {
-    font-size: 0.875rem;
-    color: var(--text-dark);
+    font-size: 0.8875rem;
+    color: #4A4A4A;
     line-height: 1.6;
+    font-weight: 500;
 }
 
 .confirm-modal-submessage-box {
-    margin-top: 12px;
-    background-color: rgba(224, 90, 71, 0.05);
-    border-left: 4px solid var(--red);
-    border-radius: 8px;
-    padding: 10px 14px;
+    margin-top: 14px;
+    background: linear-gradient(135deg, rgba(224, 90, 71, 0.06) 0%, rgba(255, 123, 167, 0.08) 100%);
+    border: 1px solid rgba(224, 90, 71, 0.2);
+    border-left: 4px solid var(--red, #E05A47);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
 }
 
 .confirm-modal-submessage {
-    font-size: 0.75rem;
-    color: var(--red);
+    font-size: 0.775rem;
+    font-weight: 600;
+    color: #B93826;
     line-height: 1.5;
 }
 
 .confirm-modal-footer {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 123, 167, 0.15);
 }
 
 .btn-modal-secondary {
-    background-color: var(--warm-gray);
-    color: var(--rose-mauve);
-    border: 1px solid rgba(0, 0, 0, 0.02);
+    padding: 10px 18px;
+    border-radius: 14px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    background: rgba(255, 240, 245, 0.75);
+    border: 1px solid rgba(255, 123, 167, 0.3);
+    color: var(--rose-mauve, #A85A7E);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-modal-secondary:hover {
-    background-color: var(--soft-pink);
+    background: #FFFFFF;
     color: var(--primary-pink);
+    border-color: var(--primary-pink);
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 123, 167, 0.18);
+}
+
+.btn-modal-secondary:active {
+    transform: scale(0.97);
+}
+
+.btn-danger {
+    padding: 10px 20px;
+    border-radius: 14px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #E05A47 0%, #EA4335 100%);
+    color: #FFFFFF;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(224, 90, 71, 0.3);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(224, 90, 71, 0.42);
+    filter: brightness(1.05);
+}
+
+.btn-danger:active {
+    transform: scale(0.97);
 }
 
 /* ==========================================
@@ -5556,9 +5633,15 @@ select.form-select option:disabled,
         width: 100% !important;
         max-width: 100% !important;
         border-radius: 28px 28px 0 0 !important;
-        padding: 20px 16px calc(24px + env(safe-area-inset-bottom)) 16px !important;
+        border: 1.5px solid rgba(255, 123, 167, 0.35) !important;
+        border-bottom: none !important;
+        background: rgba(255, 255, 255, 0.96) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        padding: 24px 20px calc(24px + env(safe-area-inset-bottom)) 20px !important;
         transform: translateY(100%) !important;
         margin: 0 !important;
+        box-shadow: 0 -12px 36px rgba(255, 123, 167, 0.15) !important;
     }
     
     .confirm-modal-overlay.active .confirm-modal-box {

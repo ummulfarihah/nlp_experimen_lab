@@ -118,6 +118,8 @@ function showCustomConfirm(title, message, submessage = '', okText = 'Ya, Hapus'
         const submessageContainer = document.getElementById('confirm-modal-submessage-container');
         const okBtn = document.getElementById('confirm-btn-ok');
         const cancelBtn = document.getElementById('confirm-btn-cancel');
+        const iconEl = document.getElementById('confirm-modal-icon');
+        const iconWrap = document.getElementById('confirm-modal-icon-wrap');
         
         // Populate contents
         titleEl.textContent = title;
@@ -130,14 +132,28 @@ function showCustomConfirm(title, message, submessage = '', okText = 'Ya, Hapus'
             submessageContainer.classList.add('hidden');
         }
         
-        okBtn.textContent = okText;
+        okBtn.innerHTML = isDanger 
+            ? `<i data-lucide="trash-2" class="w-4 h-4 inline mr-1.5"></i>${okText}`
+            : `<i data-lucide="check" class="w-4 h-4 inline mr-1.5"></i>${okText}`;
         cancelBtn.textContent = cancelText;
         
         if (isDanger) {
             okBtn.className = 'btn btn-danger';
+            if (iconWrap) iconWrap.className = 'confirm-modal-icon-bg';
+            if (iconEl) {
+                iconEl.setAttribute('data-lucide', 'trash-2');
+                iconEl.className = 'text-red w-5 h-5';
+            }
         } else {
             okBtn.className = 'btn btn-primary';
+            if (iconWrap) iconWrap.className = 'confirm-modal-icon-bg is-alert';
+            if (iconEl) {
+                iconEl.setAttribute('data-lucide', 'alert-circle');
+                iconEl.className = 'text-pink w-5 h-5';
+            }
         }
+        
+        if (window.lucide) lucide.createIcons();
         
         // Open modal
         modal.classList.remove('hidden');
@@ -150,6 +166,7 @@ function showCustomConfirm(title, message, submessage = '', okText = 'Ya, Hapus'
             modal.classList.remove('active');
             setTimeout(() => {
                 modal.classList.add('hidden');
+                if (window.lucide) lucide.createIcons();
             }, 250);
             resolve(result);
         };
@@ -166,6 +183,7 @@ function showCustomAlert(title, message, submessage = '', okText = 'Tutup') {
         const okBtn = document.getElementById('confirm-btn-ok');
         const cancelBtn = document.getElementById('confirm-btn-cancel');
         const iconEl = document.getElementById('confirm-modal-icon');
+        const iconWrap = document.getElementById('confirm-modal-icon-wrap');
         
         // Populate contents
         titleEl.textContent = title;
@@ -178,15 +196,18 @@ function showCustomAlert(title, message, submessage = '', okText = 'Tutup') {
             submessageContainer.classList.add('hidden');
         }
         
-        okBtn.textContent = okText;
+        okBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4 inline mr-1.5"></i>${okText}`;
         okBtn.className = 'btn btn-primary';
         
         // Hide cancel button for alert
         cancelBtn.classList.add('hidden');
         
-        // Change icon to warning
-        iconEl.setAttribute('data-lucide', 'alert-circle');
-        iconEl.className = 'text-pink w-6 h-6';
+        // Change icon to warning/info
+        if (iconWrap) iconWrap.className = 'confirm-modal-icon-bg is-alert';
+        if (iconEl) {
+            iconEl.setAttribute('data-lucide', 'alert-circle');
+            iconEl.className = 'text-pink w-5 h-5';
+        }
         if (window.lucide) lucide.createIcons();
         
         // Open modal
@@ -201,8 +222,11 @@ function showCustomAlert(title, message, submessage = '', okText = 'Tutup') {
             setTimeout(() => {
                 modal.classList.add('hidden');
                 cancelBtn.classList.remove('hidden'); // restore cancel button
-                iconEl.setAttribute('data-lucide', 'alert-triangle'); // restore icon
-                iconEl.className = 'text-red w-6 h-6';
+                if (iconWrap) iconWrap.className = 'confirm-modal-icon-bg';
+                if (iconEl) {
+                    iconEl.setAttribute('data-lucide', 'trash-2');
+                    iconEl.className = 'text-red w-5 h-5';
+                }
                 if (window.lucide) lucide.createIcons();
             }, 250);
             resolve(true);

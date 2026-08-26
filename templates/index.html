@@ -1228,20 +1228,25 @@
     <div id="confirm-modal" class="confirm-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="confirm-modal-box">
             <div class="confirm-modal-header">
-                <div class="confirm-modal-icon-bg">
-                    <i id="confirm-modal-icon" data-lucide="alert-triangle" class="text-red w-6 h-6"></i>
+                <div class="confirm-modal-icon-bg" id="confirm-modal-icon-wrap">
+                    <i id="confirm-modal-icon" data-lucide="trash-2" class="text-red w-5 h-5"></i>
                 </div>
-                <h3 id="confirm-modal-title" class="confirm-modal-title">Konfirmasi</h3>
+                <div class="confirm-modal-header-text">
+                    <h3 id="confirm-modal-title" class="confirm-modal-title">Konfirmasi Hapus</h3>
+                </div>
             </div>
             <div class="confirm-modal-body">
                 <p id="confirm-modal-message" class="confirm-modal-message"></p>
                 <div id="confirm-modal-submessage-container" class="confirm-modal-submessage-box hidden">
+                    <i data-lucide="alert-circle" class="w-4 h-4 text-red flex-shrink-0 mt-0.5"></i>
                     <p id="confirm-modal-submessage" class="confirm-modal-submessage"></p>
                 </div>
             </div>
             <div class="confirm-modal-footer">
-                <button id="confirm-btn-cancel" class="btn btn-modal-secondary">Batal</button>
-                <button id="confirm-btn-ok" class="btn btn-danger">Ya, Hapus</button>
+                <button type="button" id="confirm-btn-cancel" class="btn btn-modal-secondary">Batal</button>
+                <button type="button" id="confirm-btn-ok" class="btn btn-danger">
+                    <i data-lucide="trash-2" class="w-4 h-4 inline mr-1"></i>Ya, Hapus
+                </button>
             </div>
         </div>
     </div>
