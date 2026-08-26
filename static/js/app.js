@@ -2670,22 +2670,35 @@ function hidePwaInstallModal(rememberDismiss = false) {
 
 async function triggerPwaInstall() {
     if (deferredInstallPrompt) {
-        deferredInstallPrompt.prompt();
-        const choiceResult = await deferredInstallPrompt.userChoice;
-        console.log('[PWA] User choice outcome:', choiceResult.outcome);
-        if (choiceResult.outcome === 'accepted') {
-            localStorage.setItem('ummu_pwa_installed', 'true');
-            if (typeof showToast === 'function') {
-                showToast('Memasang aplikasi NLP Lab ke perangkat Anda...');
+        try {
+            deferredInstallPrompt.prompt();
+            const choiceResult = await deferredInstallPrompt.userChoice;
+            console.log('[PWA] User choice outcome:', choiceResult.outcome);
+            if (choiceResult.outcome === 'accepted') {
+                localStorage.setItem('ummu_pwa_installed', 'true');
+                if (typeof showToast === 'function') {
+                    showToast('Memasang aplikasi NLP Lab ke perangkat Anda...');
+                }
             }
+            deferredInstallPrompt = null;
+            hidePwaInstallModal();
+        } catch (err) {
+            console.warn('[PWA] Prompt error:', err);
+            hidePwaInstallModal();
         }
-        deferredInstallPrompt = null;
-        hidePwaInstallModal();
     } else {
-        // Fallback for desktop Chrome / Edge or when prompt already accepted
         hidePwaInstallModal();
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
         if (typeof showToast === 'function') {
-            showToast('💡 Buka menu browser (⋮) -> pilih "Install Aplikasi" atau "Tambah ke Layar Utama"');
+            if (isIOS) {
+                showToast('💡 Klik tombol Bagikan (Share ⎋) di browser Safari -> pilih "Tambah ke Layar Utama"');
+            } else if (isMobile) {
+                showToast('💡 Buka menu browser (⋮) -> pilih "Install Aplikasi" atau "Tambah ke Layar Utama"');
+            } else {
+                showToast('💡 Klik ikon Install (💻 / ⊕) di bilah alamat URL browser atau menu (⋮) -> "Install Ummu NLP Lab"');
+            }
         }
     }
 }
