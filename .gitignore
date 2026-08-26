@@ -160,3 +160,17 @@ scratch/
 *.njsproj
 *.sln
 *.sw?
+
+# Thesis/academic documents - not part of the app
+BAB*.md
+Buku-Pedoman-Skripsi-FIKTI-2025-1.md
+Draft Skripsi Final.md
+LAMPIRAN.md
+lampiran_*.md
+nlp_lab_documentation.md
+prd.md
+rekomendasi_repo_github.md
+
+# Secrets / Credentials
+client_secret*.json
+
