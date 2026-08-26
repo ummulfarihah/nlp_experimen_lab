@@ -36,6 +36,7 @@ let toastTimeoutId = null;
 function showToast(message, isError = false) {
     const toast = document.getElementById('toast');
     const toastMsg = document.getElementById('toast-message');
+    const toastIconWrap = document.getElementById('toast-icon-wrap');
     if (!toast || !toastMsg) return;
     
     if (toastTimeoutId) {
@@ -43,12 +44,24 @@ function showToast(message, isError = false) {
         toastTimeoutId = null;
     }
     
-    const icon = isError ? '⚠️ ' : '✅ ';
-    toastMsg.textContent = icon + message;
+    // Clean any legacy emoji prefixes from messages
+    const cleanMessage = (message || '').replace(/^([⚠️❌✅💡ℹ️]+\s*)/, '').trim();
+    toastMsg.textContent = cleanMessage;
+    
     if (isError) {
-        toast.style.borderLeftColor = '#EF4444';
+        toast.className = 'toast-capsule toast-error';
+        if (toastIconWrap) {
+            toastIconWrap.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-white"></i>';
+        }
     } else {
-        toast.style.borderLeftColor = 'var(--primary-pink)';
+        toast.className = 'toast-capsule toast-success';
+        if (toastIconWrap) {
+            toastIconWrap.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-white"></i>';
+        }
+    }
+    
+    if (window.lucide) {
+        lucide.createIcons();
     }
     
     toast.classList.remove('hidden');
@@ -59,6 +72,18 @@ function showToast(message, isError = false) {
         toastTimeoutId = null;
     }, 3200);
 }
+
+function hideToastImmediately() {
+    const toast = document.getElementById('toast');
+    if (toast) {
+        if (toastTimeoutId) {
+            clearTimeout(toastTimeoutId);
+            toastTimeoutId = null;
+        }
+        toast.classList.add('hidden');
+    }
+}
+window.hideToastImmediately = hideToastImmediately;
 
 // Global Custom Confirmation Modal Helper
 let confirmPromiseResolve = null;

@@ -31,7 +31,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png?v=75.0">
     <meta name="theme-color" content="#FFF0F5">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/style.css?v=106.0">
+    <link rel="stylesheet" href="/static/css/style.css?v=107.0">
 </head>
 <body class="bg-blush text-dark font-outfit">
 
@@ -61,9 +61,17 @@
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="toast hidden" role="alert" aria-live="assertive" aria-atomic="true">
-        <span id="toast-message">Notifikasi</span>
+    <!-- PREMIUM GLASSMORPHISM NOTIFICATION TOAST -->
+    <div id="toast" class="toast-capsule hidden" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-icon-badge" id="toast-icon-wrap">
+            <i data-lucide="check" class="w-4 h-4 text-white" id="toast-icon"></i>
+        </div>
+        <div class="toast-body">
+            <span id="toast-message" class="toast-message-text">Notifikasi</span>
+        </div>
+        <button type="button" class="toast-dismiss-btn" onclick="hideToastImmediately()" aria-label="Tutup notifikasi" title="Tutup">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
     </div>
 
     <!-- Floating Server Disconnect / Backend Health Banner -->
@@ -1400,7 +1408,7 @@
         });
     </script>
     <!-- Custom JS controllers -->
-    <script src="/static/js/charts.js?v=106.0"></script>
-    <script src="/static/js/app.js?v=106.0"></script>
+    <script src="/static/js/charts.js?v=107.0"></script>
+    <script src="/static/js/app.js?v=107.0"></script>
 </body>
 </html>
