@@ -1,5 +1,5 @@
 # Ummu NLP Experiment Lab (NLP Research Center)
-### *A Scientific & Experimental Research Platform for Indonesian Text Classification Benchmark*
+### *A Scientific and Experimental Research Platform for Indonesian Text Classification Benchmark*
 
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Framework](https://img.shields.io/badge/framework-Flask%203.0+-green.svg)](https://flask.palletsprojects.com/)
@@ -11,56 +11,107 @@
 
 ---
 
-## 📌 Ringkasan Akademik & Abstrak Proyek
+## Ringkasan Akademik dan Abstrak Proyek
 
-**Ummu NLP Experiment Lab** adalah platform laboratorium komputasi berbasis web yang dirancang secara terstandar untuk memfasilitasi penelitian empiris dan pengujian komparatif algoritma Pemrosesan Bahasa Alami (*Natural Language Processing*) pada korpus teks bahasa Indonesia. 
+**Ummu NLP Experiment Lab** adalah platform laboratorium komputasi berbasis web yang dirancang secara terstandar untuk memfasilitasi penelitian empiris dan pengujian komparatif algoritma Pemrosesan Bahasa Alami (*Natural Language Processing*) pada korpus teks bahasa Indonesia.
 
-Platform ini mengintegrasikan seluruh tahapan metodologi penelitian NLP ke dalam satu antarmuka terpadu (*Single Page Application*), mulai dari:
-1. **Manajemen Korpus & Audit Integritas Data** (*Dataset Manager* dengan verifikasi *hashing* kriptografis SHA-256).
-2. **Pipelines Rekayasa Teks Multi-Tahap** (*Preprocessing Lab*: *Case Folding*, *Noise & Punctuation Filtering*, *Dictionary-Based Slang Word Normalization*, dan *Selective Stopword Removal*).
+Platform ini mengintegrasikan seluruh tahapan metodologi penelitian NLP ke dalam satu antarmuka terpadu (*Single Page Application*), yang mencakup:
+1. **Manajemen Korpus dan Audit Integritas Data** (*Dataset Manager* dengan verifikasi *hashing* kriptografis SHA-256).
+2. **Pipeline Rekayasa Teks Multi-Tahap** (*Preprocessing Lab*: *Case Folding*, *Noise and Punctuation Filtering*, *Dictionary-Based Slang Word Normalization*, dan *Selective Stopword Removal*).
 3. **Pemodelan Komparatif Multi-Paradigma**:
    - **Model Klasikal Berbasis Frekuensi N-Gram**: *Multinomial Naive Bayes* (MNB) dan *Support Vector Machine* (SVM) dengan pembobotan *Term Frequency-Inverse Document Frequency* (TF-IDF).
    - **Model Kontekstual *Transformer Deep Pre-trained Language Model***: *IndoBERT Base* (`indobenchmark/indobert-base-p1`) yang dioptimasi melalui *Fine-Tuning* menggunakan *AdamW Optimizer* dan *Linear Warmup Learning Rate Scheduler*.
-4. **Evaluasi Empiris Komprehensif** (*Macro Precision, Macro Recall, Macro F1-Score, Accuracy, Multi-Class Confusion Matrix*, dan *Per-Class Metric Decomposition*).
-5. **Uji Validasi Hipotesis Statistik** (*McNemar’s Statistical Significance Test* dengan tabel kontingensi $2\times 2$ untuk membuktikan signifikansi perbedaan performa antar model secara objektif).
-6. **Inferensi & *Prediction Lab*** (*Single Text Inference* dan *Batch Inference CSV* dengan visualisasi sebaran probabilitas kelas).
+4. **Evaluasi Empiris Komprehensif** (*Macro Precision*, *Macro Recall*, *Macro F1-Score*, *Accuracy*, *Multi-Class Confusion Matrix*, dan *Per-Class Metric Decomposition*).
+5. **Uji Validasi Hipotesis Statistik** (*McNemar’s Statistical Significance Test* dengan tabel kontingensi $2 \times 2$ untuk membuktikan signifikansi perbedaan performa antar model secara objektif).
+6. **Inferensi dan Laboratorium Prediksi** (*Single Text Inference* dan *Batch Inference CSV* dengan visualisasi sebaran probabilitas kelas).
 
 ---
 
-## 🏛️ Landasan Teori & Formulasi Matematis
+## Landasan Teori dan Formulasi Matematis
 
-### 1. Ekstraksi Fitur: TF-IDF (*Term Frequency-Inverse Document Frequency*)
+### 1. Ekstraksi Fitur: TF-IDF (Term Frequency-Inverse Document Frequency)
 Untuk model klasikal (Naive Bayes dan SVM), teks ditransformasikan ke dalam representasi ruang vektor menggunakan skema pembobotan TF-IDF:
+
 $$\text{TF-IDF}(t, d, D) = \text{TF}(t, d) \times \text{IDF}(t, D)$$
+
+dengan fungsi Inverse Document Frequency teredam:
+
 $$\text{IDF}(t, D) = \ln\left(\frac{1 + |D|}{1 + |\{d \in D : t \in d\}|}\right) + 1$$
-Di mana $|D|$ adalah total dokumen dalam korpus latih, dan $|\{d \in D : t \in d\}|$ adalah jumlah dokumen yang memuat term $t$.
+
+Keterangan:
+- $|D|$: Total jumlah dokumen dalam korpus data latih.
+- $|\{d \in D : t \in d\}|$: Jumlah dokumen dalam korpus yang memuat term $t$.
+- $\text{TF}(t, d)$: Frekuensi kemunculan term $t$ dalam dokumen $d$.
+
+---
 
 ### 2. Algoritma Multinomial Naive Bayes
 Klasifikasi probabilistik berdasarkan Teorema Bayes dengan asumsi independensi fitur bersyarat:
-$$P(c|d) \propto P(c) \prod_{i=1}^{n} P(t_i | c)$$
-$$P(t_i | c) = \frac{N_{ci} + \alpha}{N_c + \alpha |V|}$$
-Di mana $\alpha$ merupakan parameter *Laplace Smoothing* ($\alpha = 1.0$), $N_{ci}$ adalah frekuensi kemunculan term $t_i$ pada kelas $c$, $N_c$ adalah total term pada kelas $c$, dan $|V|$ adalah ukuran vokabulari.
 
-### 3. Support Vector Machine (SVM)
-Optimasi bidang pemisah (*hyperplane*) dengan memaksimumkan *margin* geometris:
-$$\min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2} \|\mathbf{w}\|^2 + C \sum_{i=1}^{N} \xi_i$$
-$$\text{s.t.} \quad y_i (\mathbf{w}^T \phi(\mathbf{x}_i) + b) \ge 1 - \xi_i, \quad \xi_i \ge 0$$
-Di mana $C > 0$ mengatur penalti kesalahan klasifikasi (*slack variable* $\xi_i$), dan $\phi(\mathbf{x})$ memetakan vektor fitur melalui fungsi kernel (Linear atau *Radial Basis Function* / RBF).
+$$P(c \mid d) \propto P(c) \prod_{i=1}^{n} P(t_i \mid c)$$
 
-### 4. IndoBERT (*Bidirectional Encoder Representations from Transformers*)
-Arsitektur *deep bidirectional Transformer encoder* 12-layer dengan *multi-head self-attention*:
-$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
-Vektor representasi token `[CLS]` pada layer terakhir dihubungkan ke *Classification Head* (Linear layer + Softmax) dan dioptimasi menggunakan fungsi kerugian *Cross-Entropy Loss*:
-$$\mathcal{L}_{CE} = -\sum_{c=1}^{K} y_c \log(\hat{y}_c)$$
+Probabilitas kemunculan term dengan perataan Laplace (*Laplace Smoothing*):
 
-### 5. Uji Signifikansi Statistik McNemar
-Pengujian komparasi non-parametrik berpasangan pada sampel uji yang sama:
-$$\chi^2 = \frac{(|n_{01} - n_{10}| - 1)^2}{n_{01} + n_{10}}$$
-Di mana $n_{01}$ adalah jumlah data yang diprediksi benar oleh Model A namun salah oleh Model B, sedangkan $n_{10}$ adalah data yang salah oleh Model A namun benar oleh Model B. Jika $p\text{-value} < 0.05$ ($\alpha = 5\%$), hipotesis nol ($H_0$) ditolak, membuktikan perbedaan performa kedua model adalah signifikan secara statistik.
+$$P(t_i \mid c) = \frac{N_{ci} + \alpha}{N_c + \alpha |V|}$$
+
+Keterangan:
+- $\alpha$: Parameter penghalusan (*smoothing parameter*, $\alpha = 1.0$).
+- $N_{ci}$: Frekuensi kemunculan term $t_i$ pada kelas $c$.
+- $N_c$: Total frekuensi seluruh term pada kelas $c$.
+- $|V|$: Jumlah total term unik dalam vokabulari korpus.
 
 ---
 
-## 🔬 Arsitektur Sistem & Alur Kerja Penelitian
+### 3. Support Vector Machine (SVM)
+Optimasi bidang pemisah (*hyperplane*) dengan memaksimumkan *margin* geometris:
+
+$$\min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2} \|\mathbf{w}\|^2 + C \sum_{i=1}^{N} \xi_i$$
+
+dengan konstrain batas:
+
+$$y_i (\mathbf{w}^T \phi(\mathbf{x}_i) + b) \ge 1 - \xi_i, \quad \xi_i \ge 0, \quad \forall i \in \{1, \dots, N\}$$
+
+Keterangan:
+- $\mathbf{w}$: Vektor bobot normal terhadap bidang pemisah (*hyperplane*).
+- $b$: Nilai bias (*intercept*) bidang pemisah.
+- $C$: Parameter regularisasi penalti kesalahan klasifikasi ($C > 0$).
+- $\xi_i$: Variabel *slack* untuk mengakomodasi data yang tidak terpisah sempurna (*non-linearly separable*).
+- $\phi(\mathbf{x})$: Fungsi pemetaan kernel (Linear atau *Radial Basis Function* / RBF).
+
+---
+
+### 4. IndoBERT (Bidirectional Encoder Representations from Transformers)
+Arsitektur *deep bidirectional Transformer encoder* 12-layer dengan mekanisme *Multi-Head Self-Attention*:
+
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+
+Vektor representasi token `[CLS]` pada lapisan akhir diteruskan ke lapisan klasifikasi (*Classification Head*) dan dioptimasi menggunakan fungsi kerugian *Cross-Entropy Loss*:
+
+$$\mathcal{L}_{\text{CE}} = -\sum_{c=1}^{K} y_c \log(\hat{y}_c)$$
+
+Keterangan:
+- $Q, K, V$: Matriks *Query*, *Key*, dan *Value*.
+- $d_k$: Dimensi vektor representasi kunci ($d_k = 64$).
+- $K$: Jumlah kelas target klasifikasi.
+- $y_c$: Nilai biner kebenaran (*ground truth*) untuk kelas $c$.
+- $\hat{y}_c$: Probabilitas prediksi model untuk kelas $c$.
+
+---
+
+### 5. Uji Signifikansi Statistik McNemar
+Pengujian komparasi non-parametrik berpasangan pada sampel data uji yang identik:
+
+$$\chi^2 = \frac{(|n_{01} - n_{10}| - 1)^2}{n_{01} + n_{10}}$$
+
+Keterangan:
+- $n_{01}$: Jumlah sampel yang diklasifikasikan benar oleh Model A dan salah oleh Model B.
+- $n_{10}$: Jumlah sampel yang diklasifikasikan salah oleh Model A dan benar oleh Model B.
+- $df = 1$: Derajat kebebasan (*degree of freedom*) pada distribusi Chi-Square.
+- Kriteria keputusan: Jika $p\text{-value} < 0.05$ ($\alpha = 5\%$), hipotesis nol ($H_0$) ditolak, membuktikan adanya perbedaan performa yang signifikan secara statistik antara kedua model.
+
+---
+
+## Arsitektur Sistem dan Alur Kerja Penelitian
 
 ```mermaid
 flowchart TD
@@ -98,7 +149,7 @@ flowchart TD
 
 ---
 
-## 🌟 Fitur Utama Platform
+## Fitur Utama Platform
 
 | Modul | Deskripsi Fungsional Ilmiah |
 |---|---|
@@ -107,7 +158,7 @@ flowchart TD
 | **Asynchronous Training** | Pelatihan model berjalan pada *background thread worker* non-blocking. Dilengkapi *live console log streamer*, progres kalkulasi *real-time*, dan mekanisme *cancellation*. |
 | **Model Registry** | Manajemen siklus hidup berkas biner model terlatih (`.pkl` dan `.pt`), pencatatan *metadata* lingkungan komputasi, dan kontrol versi model. |
 | **Evaluation Lab** | Visualisasi grafik batang ApexCharts terintegrasi, visualisasi *heatmap* matriks kontingensi, dan perbandingan performa menyeluruh. |
-| **McNemar Statistical Test** | Analisis signifikansi statistik otomatis dengan pembentukan matriks kontingensi $2\times 2$, nilai derajat kebebasan ($df=1$), dan interpretasi otomatis $p\text{-value}$. |
+| **McNemar Statistical Test** | Analisis signifikansi statistik otomatis dengan pembentukan matriks kontingensi $2 \times 2$, nilai derajat kebebasan ($df=1$), dan interpretasi otomatis $p\text{-value}$. |
 | **Prediction Lab** | Pengujian inferensi langsung untuk teks interaktif maupun inferensi massal melalui berkas CSV dengan *download report*. |
 | **Hardware & Resource Monitor** | Pemantauan berkala penggunaan CPU, RAM, Disk Storage, dan GPU VRAM (NVIDIA L4 / T4 via NVML) secara *real-time*. |
 | **Security & Access Control** | Autentikasi Google OAuth 2.0 dengan **Email Whitelist Check** (`ALLOWED_GOOGLE_EMAILS`), hashing sandi PBKDF2/SHA256, dan perlindungan sesi. |
@@ -115,7 +166,7 @@ flowchart TD
 
 ---
 
-## 🛠️ Persyaratan Sistem (*System Requirements*)
+## Persyaratan Sistem (System Requirements)
 
 | Komponen | Spesifikasi Minimum | Rekomendasi untuk Pelatihan IndoBERT |
 |---|---|---|
@@ -127,7 +178,7 @@ flowchart TD
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan Aplikasi
+## Panduan Instalasi dan Penggunaan
 
 ### 1. Kloning Repositori
 ```bash
@@ -135,7 +186,7 @@ git clone https://github.com/ummulfarihah/nlp_experimen_lab.git
 cd nlp_experimen_lab
 ```
 
-### 2. Konfigurasi Lingkungan Virtual (*Virtual Environment*)
+### 2. Konfigurasi Lingkungan Virtual (Virtual Environment)
 
 **Pada Sistem Operasi Windows (PowerShell):**
 ```powershell
@@ -149,7 +200,7 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Instalasi Pustaka & Dependensi
+### 3. Instalasi Dependensi
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -166,7 +217,7 @@ Salin berkas konfigurasi template `.env.example` menjadi `.env`:
 ```bash
 cp .env.example .env
 ```
-Sesuaikan parameter penting pada `.env`:
+Sesuaikan parameter pada `.env`:
 ```env
 FLASK_ENV=development
 SECRET_KEY=masukkan-kunci-enkripsi-rahasia-anda
@@ -178,32 +229,32 @@ Jalankan modul verifikasi mandiri (*Self-Verification Script*) untuk memastikan 
 ```bash
 python verify.py
 ```
-*Hasil yang diharapkan: `ALL TESTS COMPLETED SUCCESSFULLY! CORE ENGINE GREEN.`*
+Hasil verifikasi sukses: `ALL TESTS COMPLETED SUCCESSFULLY! CORE ENGINE GREEN.`
 
 ### 6. Menjalankan Server Lokal Flask
 ```bash
 python app.py
 ```
-Buka peramban (*web browser*) dan akses portal pada:
+Akses portal melalui peramban pada alamat:
 **`http://127.0.0.1:5000`**
 
 ---
 
-## ☁️ Menjalankan di Google Colab (Remote GPU Acceleration)
+## Menjalankan di Google Colab (Remote GPU Acceleration)
 
 Bagi peneliti yang tidak memiliki GPU NVIDIA lokal, sistem telah dilengkapi dengan berkas notebook siap pakai **`run_server_colab.ipynb`**:
 
 1. Buka [Google Colab](https://colab.research.google.com/) dan ubah Runtime ke **GPU T4 / L4** (*Runtime $\rightarrow$ Change runtime type $\rightarrow$ T4/L4 GPU*).
 2. Unggah dan jalankan **`run_server_colab.ipynb`** secara berurutan:
-   * **Langkah 1**: Verifikasi GPU NVIDIA CUDA dan instalasi dependensi.
-   * **Langkah 2**: Kloning repositori GitHub NLP Lab.
-   * **Langkah 3**: Masukkan Ngrok Authtoken dan konfigurasi Domain Statis Ngrok.
-   * **Langkah 4**: Jalankan server Flask (`python app.py`).
+   - **Langkah 1**: Verifikasi GPU NVIDIA CUDA dan instalasi dependensi.
+   - **Langkah 2**: Kloning repositori GitHub NLP Lab.
+   - **Langkah 3**: Masukkan Ngrok Authtoken dan konfigurasi Domain Statis Ngrok.
+   - **Langkah 4**: Jalankan server Flask (`python app.py`).
 3. Akses URL publik statis yang dihasilkan untuk mengakses platform dengan kekuatan akselerasi GPU penuh.
 
 ---
 
-## 📁 Struktur Direktori Repositori
+## Struktur Direktori Repositori
 
 ```text
 nlp_experimen_lab/
@@ -242,7 +293,7 @@ nlp_experimen_lab/
 
 ---
 
-## 🧪 Pengujian Perangkat Lunak (*Test Suite*)
+## Pengujian Perangkat Lunak (Test Suite)
 
 Platform ini menerapkan standar pengujian otomatis (*Automated Unit & Integration Testing*) menggunakan pustaka `pytest` dengan cakupan 24 skenario pengujian:
 
@@ -282,7 +333,7 @@ tests/test_preprocessing.py::test_compute_dataset_hash PASSED            [100%]
 
 ---
 
-## 📚 Sitasi Akademik & Referensi
+## Sitasi Akademik dan Referensi
 
 Jika Anda menggunakan platform ini, kode sumber, atau metodologi eksperimen ini dalam penelitian akademik, tesis, atau publikasi ilmiah, silakan mengutip karya ini:
 
@@ -300,7 +351,7 @@ Jika Anda menggunakan platform ini, kode sumber, atau metodologi eksperimen ini 
 
 ---
 
-## 📄 Lisensi & Hak Cipta
+## Lisensi dan Hak Cipta
 
 Proyek ini dikembangkan untuk tujuan penelitian akademik pada **Program Studi Informatika, Fakultas Ilmu Komputer dan Teknologi Informasi (FIKTI), Universitas Muhammadiyah Sumatera Utara (UMSU)**.
 
