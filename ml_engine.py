@@ -34,19 +34,19 @@ _MODEL_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
 
 
-# Indonesian Stopwords List (Selective - Negation words preserved for Sentiment Analysis)
-INDONESIAN_STOPWORDS: Set[str] = {
+# Indonesian Stopwords List (Identical to nlp_experiments.ipynb)
+INDONESIAN_STOPWORDS: Set[str] = set([
     'yang', 'di', 'dan', 'itu', 'dengan', 'untuk', 'dari', 'ke', 'ini', 'adalah',
     'bisa', 'ada', 'pada', 'juga', 'saya', 'kami', 'mereka', 'dia', 'anda', 'kamu',
     'akan', 'telah', 'sudah', 'sedang', 'dalam', 'oleh', 'olehnya', 'atau', 'tetapi',
     'namun', 'hanya', 'saja', 'jika', 'kalau', 'karena', 'sehingga', 'maka', 'tentang',
     'seperti', 'terhadap', 'secara', 'kembali', 'kemudian', 'lalu', 'setelah',
     'sebelum', 'ketika', 'saat', 'sementara', 'bagi', 'sangat', 'amat',
-    'paling', 'lebih', 'terlalu', 'banyak', 'beberapa', 'semua',
-    'tiap', 'setiap', 'bagaimana', 'apa',
+    'paling', 'lebih', 'kurang', 'terlalu', 'banyak', 'beberapa', 'semua',
+    'tiap', 'setiap', 'bukan', 'tidak', 'tak', 'belum', 'jangan', 'bagaimana', 'apa',
     'siapa', 'dimana', 'kapan', 'mengapa', 'kenapa', 'ya', 'oh',
     'sih', 'lah', 'deh', 'kah', 'pun', 'kok', 'punya', 'buat', 'ialah'
-}
+])
 
 # Indonesian Slang / Informal Words mapping (Slang Normalization)
 SLANG_WORDS_DICT: Dict[str, str] = {

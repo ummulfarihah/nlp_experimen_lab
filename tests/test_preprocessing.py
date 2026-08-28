@@ -35,9 +35,9 @@ def test_preprocess_text_noise_removal():
 
 def test_preprocess_text_slang_normalization():
     raw = "barang nya bgt beneran bagus bgt bkn kaleng2"
-    result = preprocess_text(raw)
+    steps = preprocess_text_step_by_step(raw)
     # 'bgt' -> 'sangat', 'bkn' -> 'bukan'
-    assert "sangat" in result or "bukan" in result
+    assert "sangat" in steps["tokens"] and "bukan" in steps["tokens"]
 
 
 def test_preprocess_text_step_by_step():
