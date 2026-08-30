@@ -479,12 +479,14 @@ def run_mcnemar_test(
         p_value = 1.0
     else:
         try:
-            from scipy.stats import chi2
-            stat = (abs(n01 - n10) - 0.5)**2 / (n01 + n10)
-            p_value = float(chi2.sf(stat, 1))
+            from scipy.stats import binom
+            b = min(n01, n10)
+            n_disc = n01 + n10
+            # Two-sided Exact Binomial p-value (Persamaan 2.14 / Tabel 4.4)
+            p_value = float(min(1.0, 2.0 * binom.cdf(b, n_disc, 0.5)))
         except ImportError:
             import math
-            stat = (abs(n01 - n10) - 0.5)**2 / (n01 + n10)
+            stat = (abs(n01 - n10) - 1.0)**2 / (n01 + n10)
             if stat <= 0:
                 p_value = 1.0
             else:
