@@ -161,11 +161,15 @@ scratch/
 *.sln
 *.sw?
 
-# Word documents and binary drafts
+# Thesis / Academic Documents & Manuscript (Excluded from repository)
 *.docx
-Draft Skripsi Final old.md
-
-# Academic guides and notes
+Draft Skripsi Final*.md
+Checklist_Revisi_Skripsi.md
+BAB*.md
+LAMPIRAN.md
+lampiran_*.md
+nlp_lab_documentation.md
+selanjutnya buatkan daftar tabel poin yang tidak*.csv
 Buku-Pedoman-Skripsi-FIKTI-2025-1.md
 prd.md
 rekomendasi_repo_github.md
